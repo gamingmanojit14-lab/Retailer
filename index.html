@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{font-family:'Noto Sans Bengali',system-ui,sans-serif;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:#f1f5f9;color:#1e293b}
+.btn{padding:10px 16px;border-radius:10px;font-weight:600;border:none;cursor:pointer;transition:.15s;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none}
+.btn:active{transform:scale(.96)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:#2563eb;color:#fff}.btn-primary:hover{background:#1d4ed8}
+.btn-success{background:#16a34a;color:#fff}.btn-success:hover{background:#15803d}
+.btn-danger{background:#dc2626;color:#fff}
+.btn-warn{background:#f59e0b;color:#fff}
+.btn-dark{background:#0f172a;color:#fff}
+.btn-outline{background:#fff;border:1px solid #cbd5e1;color:#334155}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:8px}
+.btn-block{width:100%}
+.btn-lg{padding:14px 20px;font-size:16px}
+.input{width:100%;padding:12px 14px;border:1px solid #cbd5e1;border-radius:10px;font-size:15px;outline:none;background:#fff;color:#1e293b}
+.input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+select.input{cursor:pointer}
+.card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:10px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:#fff;border-radius:16px;padding:20px;max-width:460px;width:100%;max-height:92vh;overflow-y:auto}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;justify-content:space-around;padding:4px 0;border-top:1px solid #e2e8f0;box-shadow:0 -2px 10px rgba(0,0,0,.05);z-index:50}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:6px;font-size:10px;color:#64748b;cursor:pointer;text-decoration:none;background:none;border:none}
+.nav-item.active{color:#2563eb;font-weight:700}
+.nav-item .icon{font-size:20px;margin-bottom:2px}
+.drawer{position:fixed;top:0;left:-300px;bottom:0;width:280px;background:#0f172a;color:#fff;transition:left .25s;z-index:70;overflow-y:auto}
+.drawer.open{left:0}
+.drawer a{display:flex;align-items:center;gap:12px;padding:12px 20px;color:#cbd5e1;text-decoration:none;font-size:14px;border-left:3px solid transparent;cursor:pointer}
+.drawer a:hover,.drawer a.active{background:#1e293b;color:#fff;border-left-color:#2563eb}
+.drawer .section{padding:14px 20px 4px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.5px}
+.drawer .drawer-head{padding:18px 20px;border-bottom:1px solid #1e293b;font-weight:700;font-size:15px;color:#fff}
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:65;display:none}
+.backdrop.open{display:block}
+main{padding:16px;max-width:900px;margin:0 auto;padding-bottom:90px}
+.page-title{font-size:22px;font-weight:700;margin:0 0 16px}
+.text-sm{font-size:13px}.text-xs{font-size:11px}.text-slate{color:#64748b}
+.text-red{color:#dc2626}.text-green{color:#16a34a}.text-blue{color:#2563eb}
+.flex{display:flex}.items-center{align-items:center}.items-start{align-items:flex-start}.justify-between{justify-content:space-between}.flex-col{flex-direction:column}
+.gap-1{gap:6px}.gap-2{gap:12px}
+.mb-1{margin-bottom:6px}.mb-2{margin-bottom:12px}.mb-3{margin-bottom:16px}.mb-4{margin-bottom:24px}
+.mt-1{margin-top:6px}.mt-2{margin-top:12px}.mt-3{margin-top:16px}.mt-4{margin-top:24px}
+.hidden{display:none}
+.w-full{width:100%}
+.text-right{text-align:right}.text-center{text-align:center}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600}
+.badge-green{background:#dcfce7;color:#166534}
+.badge-red{background:#fee2e2;color:#b91c1c}
+.badge-blue{background:#dbeafe;color:#1e40af}
+.badge-amber{background:#fef3c7;color:#92400e}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}
+@media print{body{background:#fff}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toastWrap" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:200;pointer-events:none;"></div>
+
+<script>
+/* ============================================================
+   TextilePOS — Single File App
+   Admin + Salesman | Offline | IndexedDB | Print Invoice
+   ============================================================ */
+
+// ============ DB Layer (IndexedDB) ============
+const DB_NAME = 'TextilePOS', DB_VERSION = 1;
+let db = null;
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, DB_VERSION);
+    r.onupgradeneeded = e => {
+      const d = e.target.result;
+      ['users','products','customers','sales','payments'].forEach(n => {
+        if (!d.objectStoreNames.contains(n)) {
+          const store = d.createObjectStore(n, { keyPath: 'id', autoIncrement: true });
+          if (n === 'sales') store.createIndex('salesmanId', 'salesmanId');
+          if (n === 'customers') store.createIndex('phone', 'phone');
+        }
+      });
+    };
+    r.onsuccess = () => { db = r.result; res(db); };
+    r.onerror = () => rej(r.error);
+  });
+}
+function txn(s, m = 'readonly') { return db.transaction(s, m).objectStore(s); }
+
+const DB = {
+  add: (s, d) => new Promise((res, rej) => { const r = txn(s, 'readwrite').add(d); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }),
+  put: (s, d) => new Promise((res, rej) => { const r = txn(s, 'readwrite').put(d); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }),
+  get: (s, id) => new Promise((res, rej) => { const r = txn(s).get(id); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }),
+  all: s => new Promise((res, rej) => { const r = txn(s).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error); }),
+  del: (s, id) => new Promise((res, rej) => { const r = txn(s, 'readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }),
+  clear: s => new Promise((res, rej) => { const r = txn(s, 'readwrite').clear(); r.onsuccess = () => res(); r.onerror = () => rej(r.error); }),
+  byIndex: (s, idx, val) => new Promise((res, rej) => { const r = txn(s).index(idx).getAll(val); r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error); })
+};
+
+// ============ Utilities ============
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const bdt = n => '৳ ' + (Number(n) || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+const fmtDate = d => new Date(d).toLocaleDateString('bn-BD', { day: 'numeric', month: 'short', year: 'numeric' });
+const fmtDateTime = d => new Date(d).toLocaleString('bn-BD', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const todayKey = () => new Date().toISOString().slice(0, 10);
+
+function toast(msg, type = 'info') {
+  const colors = { info: '#0f172a', success: '#16a34a', error: '#dc2626', warn: '#f59e0b' };
+  const el = document.createElement('div');
+  el.style.cssText = `background:${colors[type]};color:#fff;padding:10px 20px;border-radius:10px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:90%;text-align:center;margin-bottom:6px;`;
+  el.textContent = msg;
+  $('toastWrap').appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+function confirmBox(msg) {
+  return new Promise(res => {
+    const ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.innerHTML = `<div class="modal" style="max-width:380px;">
+      <p style="margin:0 0 16px;font-size:15px;">${esc(msg)}</p>
+      <div class="grid-2">
+        <button class="btn btn-outline" data-act="no">না</button>
+        <button class="btn btn-danger" data-act="yes">হ্যাঁ</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e => {
+      const a = e.target.dataset?.act;
+      if (a === 'no') { ov.remove(); res(false); }
+      if (a === 'yes') { ov.remove(); res(true); }
+    });
+  });
+}
+
+// Print HTML in hidden iframe
+function printHTML(html) {
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument;
+  doc.open(); doc.write(html); doc.close();
+  iframe.onload = () => {
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => iframe.remove(), 2000);
+    }, 200);
+  };
+}
+
+// ============ Sync Layer (BroadcastChannel) ============
+const syncChannel = ('BroadcastChannel' in window) ? new BroadcastChannel('textilepos-sync') : null;
+function broadcast(type) {
+  if (syncChannel) syncChannel.postMessage({ type, at: Date.now() });
+}
+if (syncChannel) {
+  syncChannel.onmessage = e => {
+    if (e.data?.type === 'data-changed') {
+      // refresh current view
+      if (App.user) App.render();
+    }
+  };
+}
+
+// ============ Business Logic ============
+async function generateInvoiceNo() {
+  const all = await DB.all('sales');
+  const t = new Date();
+  const ymd = `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}`;
+  const prefix = `INV-${ymd}-`;
+  const n = all.filter(s => s.invoiceNo?.startsWith(prefix)).length + 1;
+  return `${prefix}${String(n).padStart(4, '0')}`;
+}
+
+async function findOrCreateCustomer({ id, name, phone }) {
+  if (id) return DB.get('customers', id);
+  if (!name) return null;
+  const all = await DB.all('customers');
+  let found = phone ? all.find(c => c.phone === phone) : null;
+  if (!found) found = all.find(c => c.name === name && !phone);
+  if (found) return found;
+  const newId = await DB.add('customers', { name, phone: phone || '', due: 0, createdAt: new Date().toISOString() });
+  return DB.get('customers', newId);
+}
+
+async function createSale({ items, customerInfo, discount, paid, paymentMethod, note, salesmanId, salesmanName, type }) {
+  const invoiceNo = await generateInvoiceNo();
+  const customer = await findOrCreateCustomer(customerInfo);
+  const subtotal = items.reduce((s, i) => s + i.qty * i.rate, 0);
+  const total = subtotal - (discount || 0);
+  const due = total - (paid || 0);
+
+  const sale = {
+    invoiceNo,
+    customerId: customer?.id || null,
+    customerName: customer?.name || 'ওয়াক-ইন কাস্টমার',
+    customerPhone: customer?.phone || '',
+    salesmanId,
+    salesmanName,
+    type: type || 'retail',
+    items: items.map(i => ({ productId: i.productId, name: i.name, qty: i.qty, rate: i.rate, total: i.qty * i.rate })),
+    subtotal, discount: discount || 0, total, paid: paid || 0, due,
+    paymentMethod: paymentMethod || 'cash',
+    note: note || '',
+    saleDate: new Date().toISOString()
+  };
+
+  const saleId = await DB.add('sales', sale);
+  sale.id = saleId;
+
+  // stock update
+  for (const it of items) {
+    const p = await DB.get('products', it.productId);
+    if (p) { p.stockQty = (p.stockQty || 0) - it.qty; await DB.put('products', p); }
+  }
+
+  // customer due
+  if (customer && due > 0) {
+    customer.due = (customer.due || 0) + due;
+    await DB.put('customers', customer);
+  }
+
+  // payment record
+  if (paid > 0 && customer) {
+    await DB.add('payments', {
+      customerId: customer.id, customerName: customer.name,
+      amount: paid, method: paymentMethod || 'cash',
+      note: `Sale ${invoiceNo}`, salesmanName,
+      paymentDate: new Date().toISOString()
+    });
+  }
+
+  broadcast('data-changed');
+  return sale;
+}
+
+// ============ Invoice HTML Builder ============
+function buildInvoiceHTML(sale, opts = {}) {
+  const shop = opts.shopName || 'আমার দোকান';
+  const addr = opts.shopAddr || '';
+  const phone = opts.shopPhone || '';
+  const items = sale.items.map((it, i) => `
+    <tr>
+      <td style="padding:6px 4px;border-bottom:1px solid #e5e7eb;text-align:center;">${i + 1}</td>
+      <td style="padding:6px 4px;border-bottom:1px solid #e5e7eb;">${esc(it.name)}</td>
+      <td style="padding:6px 4px;border-bottom:1px solid #e5e7eb;text-align:right;">${it.qty}</td>
+      <td style="padding:6px 4px;border-bottom:1px solid #e5e7eb;text-align:right;">${bdt(it.rate)}</td>
+      <td style="padding:6px 4px;border-bottom:1px solid #e5e7eb;text-align:right;">${bdt(it.total)}</td>
+    </tr>`).join('');
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(sale.invoiceNo)}</title>
+  <style>
+    *{font-family:'Noto Sans Bengali',Arial,sans-serif;box-sizing:border-box}
+    body{margin:0;padding:14px;color:#111;font-size:13px;max-width:340px}
+    .head{text-align:center;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:10px}
+    .head h1{margin:0;font-size:20px}
+    .head p{margin:2px 0;font-size:11px}
+    .row{display:flex;justify-content:space-between;font-size:11px;margin:2px 0}
+    table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px}
+    th{background:#f3f4f6;padding:5px 4px;text-align:left;font-size:11px;border-bottom:2px solid #111}
+    .total-block{margin-top:8px;border-top:2px solid #111;padding-top:6px}
+    .total-block .row{font-size:13px;margin:4px 0}
+    .grand{font-size:17px;font-weight:700}
+    .foot{text-align:center;margin-top:14px;font-size:11px;border-top:1px dashed #999;padding-top:8px}
+    @media print{body{padding:6px} .no-print{display:none}}
+  </style></head><body>
+    <div class="head">
+      <h1>${esc(shop)}</h1>
+      ${addr ? `<p>${esc(addr)}</p>` : ''}
+      ${phone ? `<p>মোবাইল: ${esc(phone)}</p>` : ''}
+    </div>
+    <div class="row"><b>ইনভয়েস:</b><span>${esc(sale.invoiceNo)}</span></div>
+    <div class="row"><b>তারিখ:</b><span>${fmtDateTime(sale.saleDate)}</span></div>
+    <div class="row"><b>কাস্টমার:</b><span>${esc(sale.customerName)}</span></div>
+    ${sale.customerPhone ? `<div class="row"><b>মোবাইল:</b><span>${esc(sale.customerPhone)}</span></div>` : ''}
+    ${sale.salesmanName ? `<div class="row"><b>সেলসম্যান:</b><span>${esc(sale.salesmanName)}</span></div>` : ''}
+
+    <table>
+      <thead><tr>
+        <th style="width:24px;text-align:center">#</th>
+        <th>আইটেম</th>
+        <th style="text-align:right">পরিমাণ</th>
+        <th style="text-align:right">দর</th>
+        <th style="text-align:right">মোট</th>
+      </tr></thead>
+      <tbody>${items}</tbody>
+    </table>
+
+    <div class="total-block">
+      <div class="row"><span>সাবটোটাল</span><span>${bdt(sale.subtotal)}</span></div>
+      ${sale.discount ? `<div class="row"><span>ডিসকাউন্ট</span><span>-${bdt(sale.discount)}</span></div>` : ''}
+      <div class="row grand"><span>মোট</span><span>${bdt(sale.total)}</span></div>
+      <div class="row"><span>পরিশোধ</span><span>${bdt(sale.paid)}</span></div>
+      ${sale.due > 0 ? `<div class="row" style="color:#b91c1c;font-weight:700"><span>বাকি</span><span>${bdt(sale.due)}</span></div>` : ''}
+      <div class="row" style="font-size:11px;color:#555"><span>পেমেন্ট</span><span>${esc(sale.paymentMethod)}</span></div>
+    </div>
+    <div class="foot">ধন্যবাদ! আবার আসবেন 🙏</div>
+  </body></html>`;
+}
+
+// ============ App State & Router ============
+const App = {
+  user: null,          // {id, name, role: 'admin'|'salesman'}
+  page: 'dashboard',
+  cart: [],
+  customerSel: { mode: 'walkin', id: null, name: '', phone: '' },
+  discount: 0,
+  paid: 0,
+  method: 'cash',
+  saleType: 'retail',
+  mobileDrawer: false,
+
+  async login(role, name, password) {
+    if (role === 'admin') {
+      // default admin credentials: admin / admin123
+      if (name !== 'admin' || password !== 'admin123') {
+        const users = await DB.all('users');
+        const u = users.find(u => u.role === 'admin' && u.name === name && u.password === password);
+        if (!u) throw new Error('ভুল ইউজারনেম বা পাসওয়ার্ড');
+        this.setUser(u);
+        return;
+      }
+      this.setUser({ id: 0, name: 'Admin', role: 'admin' });
+      return;
+    }
+    // salesman
+    const users = await DB.all('users');
+    const u = users.find(u => u.role === 'salesman' && u.name === name && u.password === password);
+    if (!u) throw new Error('ভুল ইউজারনেম বা পাসওয়ার্ড');
+    this.setUser(u);
+  },
+
+  setUser(user) {
+    this.user = user;
+    localStorage.setItem('textilepos-user', JSON.stringify(user));
+    this.page = user.role === 'admin' ? 'dashboard' : 'pos';
+    this.render();
+  },
+
+  logout() {
+    this.user = null;
+    localStorage.removeItem('textilepos-user');
+    this.render();
+  },
+
+  go(page) { this.page = page; this.mobileDrawer = false; this.render(); },
+
+  async render() {
+    const root = $('app');
+    if (!this.user) { root.innerHTML = LoginView(); return; }
+    const layout = LayoutView();
+    root.innerHTML = layout.html;
+    const content = $('pageContent');
+    const fn = Pages[this.page];
+    if (fn) content.innerHTML = await fn();
+    attachPageEvents();
+  }
+};
+
+// ============ Login View ============
+function LoginView() {
+  return `
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2563eb,#4f46e5);padding:16px;">
+      <div class="card" style="width:100%;max-width:420px;">
+        <div class="text-center mb-4">
+          <div style="font-size:56px;line-height:1;">🧵</div>
+          <h1 style="font-size:24px;font-weight:700;margin:8px 0 4px;">TextilePOS</h1>
+          <p class="text-slate text-xs">কাপড়ের ব্যবসার সফটওয়্যার</p>
+          <p class="text-green text-xs mt-1">💾 সব ডেটা আপনার ডিভাইসে</p>
+        </div>
+
+        <div class="grid-2 mb-3">
+          <button class="btn btn-primary" id="roleAdmin" style="padding:16px 10px;flex-direction:column;">
+            <span style="font-size:26px;">👑</span><span>অ্যাডমিন</span>
+          </button>
+          <button class="btn btn-outline" id="roleSales" style="padding:16px 10px;flex-direction:column;">
+            <span style="font-size:26px;">🧑‍💼</span><span>সেলসম্যান</span>
+          </button>
+        </div>
+
+        <div id="loginForm" style="display:none;">
+          <label class="text-xs text-slate">ইউজারনেম</label>
+          <input class="input mb-2" id="lgName" placeholder="নাম" autocomplete="off" />
+          <label class="text-xs text-slate">পাসওয়ার্ড</label>
+          <input class="input mb-3" id="lgPass" type="password" placeholder="পাসওয়ার্ড" />
+          <button class="btn btn-primary btn-block btn-lg" id="lgBtn">লগইন</button>
+          <p class="text-xs text-slate text-center mt-3" id="hint"></p>
+        </div>
+
+        <p class="text-xs text-slate text-center mt-4">
+          🔒 কোনো সার্ভার নেই • ইন্টারনেট ছাড়াই চলে
+        </p>
+      </div>
+    </div>`;
+}
+
+function attachLoginEvents() {
+  const adminBtn = $('roleAdmin'), salesBtn = $('roleSales');
+  const form = $('loginForm'), hint = $('hint'), nameI = $('lgName'), passI = $('lgPass'), btn = $('lgBtn');
+  if (!adminBtn) return;
+
+  let currentRole = null;
+
+  adminBtn.onclick = () => {
+    currentRole = 'admin';
+    form.style.display = 'block';
+    adminBtn.className = 'btn btn-primary';
+    salesBtn.className = 'btn btn-outline';
+    hint.textContent = 'ডিফল্ট: admin / admin123';
+    nameI.value = 'admin'; passI.value = 'admin123';
+  };
+  salesBtn.onclick = async () => {
+    currentRole = 'salesman';
+    form.style.display = 'block';
+    salesBtn.className = 'btn btn-primary';
+    adminBtn.className = 'btn btn-outline';
+    const users = await DB.all('users');
+    const salesmen = users.filter(u => u.role === 'salesman');
+    hint.textContent = salesmen.length ? 'আপনার অ্যাডমিনের দেওয়া লগইন ব্যবহার করুন' : '⚠️ এখনো কোনো সেলসম্যান তৈরি হয়নি। অ্যাডমিন প্যানেল থেকে যোগ করুন।';
+    nameI.value = ''; passI.value = '';
+  };
+
+  btn.onclick = async () => {
+    try {
+      await App.login(currentRole, nameI.value.trim(), passI.value);
+      toast('স্বাগতম!', 'success');
+    } catch (e) { toast(e.message, 'error'); }
+  };
+}
+
+// ============ Layout View ============
+function LayoutView() {
+  const isAdmin = App.user.role === 'admin';
+
+  const adminMenu = [
+    { section: 'প্রধান' },
+    { key: 'dashboard', icon: '📊', label: 'ড্যাশবোর্ড' },
+    { section: 'বিক্রয়' },
+    { key: 'sales', icon: '🧾', label: 'সব বিক্রয়' },
+    { key: 'customers', icon: '👤', label: 'কাস্টমার' },
+    { key: 'products', icon: '📦', label: 'প্রোডাক্ট' },
+    { section: 'টিম' },
+    { key: 'salesmen', icon: '🧑‍💼', label: 'সেলসম্যান' },
+    { section: 'সিস্টেম' },
+    { key: 'sync', icon: '📡', label: 'সিঙ্ক ও ব্যাকআপ' },
+    { key: 'settings', icon: '⚙️', label: 'সেটিংস' }
+  ];
+
+  const salesMenu = [
+    { section: 'প্রধান' },
+    { key: 'pos', icon: '🛒', label: 'নতুন বিক্রয়' },
+    { key: 'mysales', icon: '🧾', label: 'আমার বিক্রয়' },
+    { key: 'customers', icon: '👤', label: 'কাস্টমার' },
+    { key: 'products', icon: '📦', label: 'প্রোডাক্ট' },
+    { section: 'সিস্টেম' },
+    { key: 'sync', icon: '📡', label: 'সিঙ্ক' }
+  ];
+
+  const menu = isAdmin ? adminMenu : salesMenu;
+  const drawer = menu.map(m => m.section
+    ? `<div class="section">${m.section}</div>`
+    : `<a data-page="${m.key}" class="${App.page === m.key ? 'active' : ''}">
+         <span style="font-size:18px">${m.icon}</span><span>${m.label}</span></a>`
+  ).join('');
+
+  const bottom = isAdmin
+    ? [
+        { key: 'dashboard', icon: '📊', label: 'হোম' },
+        { key: 'sales', icon: '🧾', label: 'বিক্রয়' },
+        { key: 'salesmen', icon: '🧑‍💼', label: 'টিম' },
+        { key: 'sync', icon: '📡', label: 'সিঙ্ক' }
+      ]
+    : [
+        { key: 'pos', icon: '🛒', label: 'বিক্রয়' },
+        { key: 'mysales', icon: '🧾', label: 'বিল' },
+        { key: 'products', icon: '📦', label: 'প্রোডাক্ট' },
+        { key: 'sync', icon: '📡', label: 'সিঙ্ক' }
+      ];
+
+  const bottomHtml = bottom.map(b => `
+    <button class="nav-item ${App.page === b.key ? 'active' : ''}" data-page="${b.key}">
+      <span class="icon">${b.icon}</span><span>${b.label}</span>
+    </button>`).join('');
+
+  const roleBadge = isAdmin
+    ? '<span class="badge badge-blue">👑 অ্যাডমিন</span>'
+    : '<span class="badge badge-green">🧑‍💼 সেলসম্যান</span>';
+
+  return {
+    html: `
+      <div class="backdrop" id="backdrop"></div>
+      <div class="drawer" id="drawer">
+        <div class="drawer-head">🧵 TextilePOS</div>
+        <div style="padding:12px 20px;border-bottom:1px solid #1e293b;">
+          ${roleBadge}
+          <div style="color:#fff;font-size:13px;margin-top:6px;font-weight:600;">${esc(App.user.name)}</div>
+        </div>
+        ${drawer}
+        <div style="padding:16px 20px;">
+          <button class="btn btn-danger btn-block btn-sm" id="logoutBtn">🚪 লগআউট</button>
+        </div>
+      </div>
+      <header style="background:#2563eb;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:40;box-shadow:0 2px 6px rgba(0,0,0,.1);">
+        <button id="drawerBtn" style="background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px 8px;">☰</button>
+        <h1 style="font-size:15px;margin:0;font-weight:700;">🧵 TextilePOS</h1>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="font-size:11px;opacity:.9;">${esc(App.user.name)}</span>
+        </div>
+      </header>
+      <main id="pageContent"></main>
+      <nav class="bottom-nav">${bottomHtml}</nav>`
+  };
+}
+
+function attachPageEvents() {
+  // login page
+  if (!App.user) { attachLoginEvents(); return; }
+
+  // drawer & nav
+  const drawer = $('drawer'), backdrop = $('backdrop');
+  const openDrawer = () => { drawer.classList.add('open'); backdrop.classList.add('open'); };
+  const closeDrawer = () => { drawer.classList.remove('open'); backdrop.classList.remove('open'); };
+
+  const db1 = $('drawerBtn'); if (db1) db1.onclick = openDrawer;
+  backdrop.onclick = closeDrawer;
+  $('logoutBtn').onclick = () => App.logout();
+
+  document.querySelectorAll('[data-page]').forEach(el => {
+    el.onclick = () => { App.go(el.dataset.page); };
+  });
+
+  // page-specific events
+  const fn = PageEvents[App.page];
+  if (fn) fn();
+}
+
+// ============ Pages ============
+const Pages = {};
+
+// ---------- Admin: Dashboard ----------
+Pages.dashboard = async () => {
+  const [sales, customers, products, users] = await Promise.all([
+    DB.all('sales'), DB.all('customers'), DB.all('products'), DB.all('users')
+  ]);
+  const today = todayKey();
+  const todaySales = sales.filter(s => s.saleDate?.slice(0, 10) === today);
+  const todayTotal = todaySales.reduce((s, x) => s + x.total, 0);
+  const totalDue = customers.reduce((s, c) => s + (c.due || 0), 0);
+  const totalSales = sales.reduce((s, x) => s + x.total, 0);
+  const salesmen = users.filter(u => u.role === 'salesman');
+
+  // recent sales
+  const recent = sales.slice().sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate)).slice(0, 6);
+
+  const cards = [
+    { lbl: 'আজকের বিক্রয়', val: bdt(todayTotal), sub: `${todaySales.length} টি বিল`, color: '#3b82f6' },
+    { lbl: 'মোট বিক্রয়', val: bdt(totalSales), sub: `${sales.length} টি বিল`, color: '#16a34a' },
+    { lbl: 'মোট বাকি', val: bdt(totalDue), sub: `${customers.filter(c => c.due > 0).length} জন কাস্টমার`, color: '#dc2626' },
+    { lbl: 'সেলসম্যান', val: salesmen.length, sub: `${products.length} টি প্রোডাক্ট`, color: '#f59e0b' }
+  ];
+
+  return `
+    <h1 class="page-title">📊 ড্যাশবোর্ড</h1>
+    <div class="grid-2 mb-3">
+      ${cards.map(c => `<div class="card">
+        <div style="width:32px;height:3px;background:${c.color};border-radius:2px;margin-bottom:8px;"></div>
+        <div class="text-xs text-slate">${c.lbl}</div>
+        <div style="font-size:20px;font-weight:700;margin-top:4px;">${c.val}</div>
+        <div class="text-xs text-slate mt-1">${c.sub}</div>
+      </div>`).join('')}
+    </div>
+
+    <h2 style="font-size:16px;font-weight:700;margin:16px 0 10px;">সাম্প্রতিক বিক্রয়</h2>
+    ${recent.length === 0
+      ? '<div class="card text-center text-slate">কোনো বিক্রয় নেই</div>'
+      : recent.map(s => `
+        <div class="card" style="cursor:pointer;" data-view-sale="${s.id}">
+          <div class="flex justify-between items-start">
+            <div>
+              <div style="font-weight:600;font-size:14px;">${esc(s.invoiceNo)}</div>
+              <div class="text-sm text-slate">${esc(s.customerName)} • ${esc(s.salesmanName || 'N/A')}</div>
+              <div class="text-xs text-slate">${fmtDateTime(s.saleDate)}</div>
+            </div>
+            <div class="text-right">
+              <div style="font-weight:700;">${bdt(s.total)}</div>
+              ${s.due > 0 ? `<div class="text-xs text-red">বাকি: ${bdt(s.due)}</div>` : '<span class="badge badge-green text-xs">পরিশোধ</span>'}
+            </div>
+          </div>
+        </div>`).join('')}`;
+};
+
+// ---------- Admin: Sales List ----------
+Pages.sales = async () => {
+  const sales = (await DB.all('sales')).sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate));
+  const users = await DB.all('users');
+  const salesmen = users.filter(u => u.role === 'salesman');
+
+  return `
+    <h1 class="page-title">🧾 সব বিক্রয় (${sales.length})</h1>
+    <div class="card mb-3" style="display:flex;gap:8px;flex-wrap:wrap;">
+      <input class="input" style="flex:1;min-width:200px;" placeholder="🔍 ইনভয়েস/কাস্টমার/সেলসম্যান" id="salesSearch" />
+      <select class="input" style="width:auto;" id="salesFilter">
+        <option value="">সব সেলসম্যান</option>
+        ${salesmen.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div id="salesList">
+      ${sales.length === 0 ? '<div class="card text-center text-slate" style="padding:32px;">কোনো বিক্রয় নেই</div>' : ''}
+      ${sales.map(s => `
+        <div class="card sale-row" data-view-sale="${s.id}" data-text="${esc((s.invoiceNo + ' ' + s.customerName + ' ' + (s.salesmanName || '')).toLowerCase())}" data-sm="${s.salesmanId || ''}" style="cursor:pointer;">
+          <div class="flex justify-between items-start">
+            <div>
+              <div style="font-weight:600;font-size:14px;">${esc(s.invoiceNo)}</div>
+              <div class="text-sm text-slate">👤 ${esc(s.customerName)}</div>
+              <div class="text-xs text-slate">🧑‍💼 ${esc(s.salesmanName || '-')} • ${fmtDateTime(s.saleDate)}</div>
+              <div class="text-xs text-slate">${s.items.length} আইটেম • ${s.type === 'wholesale' ? 'হোলসেল' : 'রিটেল'}</div>
+            </div>
+            <div class="text-right">
+              <div style="font-weight:700;">${bdt(s.total)}</div>
+              ${s.due > 0 ? `<div class="text-xs text-red">বাকি: ${bdt(s.due)}</div>` : '<span class="badge badge-green">পরিশোধ</span>'}
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+};
+
+// ---------- Admin: Salesmen ----------
+Pages.salesmen = async () => {
+  const users = await DB.all('users');
+  const salesmen = users.filter(u => u.role === 'salesman');
+  const sales = await DB.all('sales');
+
+  return `
+    <div class="flex justify-between items-center mb-3">
+      <h1 class="page-title" style="margin:0;">🧑‍💼 সেলসম্যান</h1>
+      <button class="btn btn-primary" id="addSalesman">+ নতুন</button>
+    </div>
+    ${salesmen.length === 0 ? '<div class="card text-center text-slate" style="padding:32px;">কোনো সেলসম্যান নেই। "+ নতুন" চাপুন।</div>' : ''}
+    ${salesmen.map(s => {
+      const ss = sales.filter(x => x.salesmanId === s.id);
+      const total = ss.reduce((a, b) => a + b.total, 0);
+      return `
+        <div class="card">
+          <div class="flex justify-between items-start mb-2">
+            <div>
+              <div style="font-weight:600;">${esc(s.name)}</div>
+              <div class="text-sm text-slate">লগইন: ${esc(s.name)} / ${esc(s.password)}</div>
+            </div>
+            <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;" data-del-sm="${s.id}">মুছুন</button>
+          </div>
+          <div class="grid-3">
+            <div class="text-center" style="padding:8px;background:#eff6ff;border-radius:8px;">
+              <div class="text-xs text-slate">বিক্রয়</div>
+              <div style="font-weight:700;">${ss.length}</div>
+            </div>
+            <div class="text-center" style="padding:8px;background:#dcfce7;border-radius:8px;">
+              <div class="text-xs text-slate">মোট</div>
+              <div style="font-weight:700;">${bdt(total)}</div>
+            </div>
+            <div class="text-center" style="padding:8px;background:#fef3c7;border-radius:8px;">
+              <div class="text-xs text-slate">আজ</div>
+              <div style="font-weight:700;">${ss.filter(x => x.saleDate?.slice(0, 10) === todayKey()).length}</div>
+            </div>
+          </div>
+        </div>`;
+    }).join('')}`;
+};
+
+// ---------- Admin: Customers ----------
+Pages.customers = async () => {
+  const cs = (await DB.all('customers')).sort((a, b) => (b.due || 0) - (a.due || 0));
+  return `
+    <div class="flex justify-between items-center mb-3">
+      <h1 class="page-title" style="margin:0;">👤 কাস্টমার (${cs.length})</h1>
+      <button class="btn btn-primary" id="addCustomer">+ নতুন</button>
+    </div>
+    <input class="input mb-3" placeholder="🔍 নাম/মোবাইল" id="custSearch" />
+    <div id="custList">
+      ${cs.length === 0 ? '<div class="card text-center text-slate" style="padding:32px;">কোনো কাস্টমার নেই</div>' : ''}
+      ${cs.map(c => `
+        <div class="card cust-row" data-text="${esc((c.name + ' ' + (c.phone || '')).toLowerCase())}">
+          <div class="flex justify-between items-start">
+            <div>
+              <div style="font-weight:600;">${esc(c.name)}</div>
+              <div class="text-sm text-slate">${esc(c.phone || '-')}</div>
+            </div>
+            <div class="text-right">
+              <div class="${c.due > 0 ? 'text-red' : 'text-green'}" style="font-weight:700;">বাকি: ${bdt(c.due)}</div>
+              ${c.due > 0 ? `<button class="btn btn-sm mt-1" style="background:#dcfce7;color:#166534;" data-pay-cust="${c.id}">পেমেন্ট</button>` : ''}
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+};
+
+// ---------- Admin/Salesman: Products ----------
+Pages.products = async () => {
+  const ps = (await DB.all('products')).sort((a, b) => b.id - a.id);
+  return `
+    <div class="flex justify-between items-center mb-3">
+      <h1 class="page-title" style="margin:0;">📦 প্রোডাক্ট (${ps.length})</h1>
+      <button class="btn btn-primary" id="addProduct">+ নতুন</button>
+    </div>
+    <input class="input mb-3" placeholder="🔍 প্রোডাক্ট খুঁজুন" id="prodSearch" />
+    <div id="prodList">
+      ${ps.length === 0 ? '<div class="card text-center text-slate" style="padding:32px;">কোনো প্রোডাক্ট নেই</div>' : ''}
+      ${ps.map(p => `
+        <div class="card prod-row" data-text="${esc(p.name.toLowerCase())}">
+          <div class="flex justify-between items-start">
+            <div>
+              <div style="font-weight:600;">${esc(p.name)}</div>
+              <div class="text-sm text-slate">হোলসেল: ${bdt(p.wholesalePrice)} • রিটেল: ${bdt(p.retailPrice)}</div>
+              <div class="text-sm ${p.stockQty <= (p.lowStockAlert || 5) ? 'text-red' : 'text-slate'}" style="font-weight:${p.stockQty <= (p.lowStockAlert || 5) ? '700' : '400'};">
+                স্টক: ${p.stockQty} ${esc(p.unit || 'পিস')}
+              </div>
+            </div>
+            <div class="flex flex-col gap-1">
+              <button class="btn btn-sm" style="background:#dbeafe;color:#1e40af;" data-edit-prod="${p.id}">এডিট</button>
+              <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;" data-del-prod="${p.id}">মুছুন</button>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+};
+
+// ---------- Salesman: POS ----------
+Pages.pos = async () => {
+  const products = await DB.all('products');
+  const customers = await DB.all('customers');
+  const cart = App.cart;
+  const subtotal = cart.reduce((s, i) => s + i.qty * i.rate, 0);
+  const total = subtotal - App.discount;
+  const due = total - App.paid;
+
+  const sel = App.customerSel;
+
+  return `
+    <h1 class="page-title">🛒 নতুন বিক্রয়</h1>
+
+    <div class="card mb-3" style="display:flex;gap:8px;flex-wrap:wrap;">
+      <input class="input" style="flex:1;min-width:180px;" placeholder="🔍 প্রোডাক্ট খুঁজুন..." id="posSearch" />
+      <select class="input" style="width:auto;" id="posType">
+        <option value="retail" ${App.saleType === 'retail' ? 'selected' : ''}>রিটেল</option>
+        <option value="wholesale" ${App.saleType === 'wholesale' ? 'selected' : ''}>হোলসেল</option>
+      </select>
+    </div>
+
+    <div class="grid-2 mb-4" id="posGrid" style="padding-bottom:20px;">
+      ${products.length === 0 ? '<div class="card" style="grid-column:1/-1;text-align:center;color:#94a3b8;padding:24px;">কোনো প্রোডাক্ট নেই</div>' : ''}
+      ${products.map(p => `
+        <button class="card pos-prod" data-name="${esc(p.name.toLowerCase())}" data-id="${p.id}" style="text-align:left;cursor:pointer;margin:0;">
+          <div style="font-weight:600;font-size:14px;">${esc(p.name)}</div>
+          <div class="text-blue" style="font-weight:700;margin-top:6px;">${bdt(App.saleType === 'wholesale' ? p.wholesalePrice : p.retailPrice)}</div>
+          <div class="text-xs text-slate mt-1">স্টক: ${p.stockQty}</div>
+        </button>`).join('')}
+    </div>
+
+    ${cart.length ? `
+      <div class="card" style="border:2px solid #2563eb;">
+        <div class="flex justify-between items-center mb-2">
+          <b>🛒 কার্ট (${cart.length})</b>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;" id="clearCart">সব মুছুন</button>
+        </div>
+        ${cart.map((it, i) => `
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+            <div style="flex:1;">${esc(it.name)}</div>
+            <button class="btn btn-sm" style="background:#e2e8f0;padding:4px 10px;" data-qty="dec" data-i="${i}">−</button>
+            <span style="width:24px;text-align:center;font-weight:700;">${it.qty}</span>
+            <button class="btn btn-sm" style="background:#e2e8f0;padding:4px 10px;" data-qty="inc" data-i="${i}">+</button>
+            <div style="width:70px;text-align:right;">${bdt(it.qty * it.rate)}</div>
+            <button class="btn btn-sm" style="background:transparent;color:#dc2626;padding:4px 8px;" data-rm="${i}">✕</button>
+          </div>`).join('')}
+      </div>
+
+      <div class="card">
+        <div class="mb-2"><b>👤 কাস্টমার</b></div>
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
+          <button class="btn btn-sm ${sel.mode === 'walkin' ? 'btn-primary' : 'btn-outline'}" data-cust-mode="walkin">ওয়াক-ইন</button>
+          <button class="btn btn-sm ${sel.mode === 'existing' ? 'btn-primary' : 'btn-outline'}" data-cust-mode="existing">পুরনো</button>
+          <button class="btn btn-sm ${sel.mode === 'new' ? 'btn-primary' : 'btn-outline'}" data-cust-mode="new">🆕 নতুন</button>
+        </div>
+        ${sel.mode === 'existing' ? `
+          <select class="input" id="posCustSel">
+            <option value="">সিলেক্ট করুন</option>
+            ${customers.map(c => `<option value="${c.id}" ${sel.id == c.id ? 'selected' : ''}>${esc(c.name)} ${c.phone ? '(' + esc(c.phone) + ')' : ''} ${c.due > 0 ? 'বাকি ' + bdt(c.due) : ''}</option>`).join('')}
+          </select>` : ''}
+        ${sel.mode === 'new' ? `
+          <input class="input mb-2" placeholder="নতুন কাস্টমারের নাম *" id="newCustName" value="${esc(sel.name)}" />
+          <input class="input" placeholder="মোবাইল (ঐচ্ছিক)" id="newCustPhone" value="${esc(sel.phone)}" />` : ''}
+      </div>
+
+      <div class="card">
+        <div class="flex justify-between mb-2"><span>সাবটোটাল</span><b>${bdt(subtotal)}</b></div>
+        <div class="flex justify-between items-center mb-2">
+          <span>ডিসকাউন্ট</span>
+          <input type="number" id="posDiscount" value="${App.discount || ''}" style="width:110px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;text-align:right;" />
+        </div>
+        <div class="flex justify-between mb-2" style="font-size:18px;font-weight:700;border-top:1px solid #e2e8f0;padding-top:8px;">
+          <span>মোট</span><span>${bdt(total)}</span>
+        </div>
+        <div class="flex justify-between items-center mb-2">
+          <span>পরিশোধ</span>
+          <input type="number" id="posPaid" value="${App.paid || ''}" style="width:110px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;text-align:right;" />
+        </div>
+        <select class="input mb-2" id="posMethod">
+          <option value="cash" ${App.method === 'cash' ? 'selected' : ''}>ক্যাশ</option>
+          <option value="bkash" ${App.method === 'bkash' ? 'selected' : ''}>বিকাশ</option>
+          <option value="nagad" ${App.method === 'nagad' ? 'selected' : ''}>নগদ</option>
+          <option value="rocket" ${App.method === 'rocket' ? 'selected' : ''}>রকেট</option>
+          <option value="bank" ${App.method === 'bank' ? 'selected' : ''}>ব্যাংক</option>
+        </select>
+        <div class="flex justify-between text-red mb-3" style="font-weight:700;">
+          <span>বাকি</span><span>${bdt(due)}</span>
+        </div>
+        <button class="btn btn-primary btn-block btn-lg" id="submitSale">✅ বিক্রয় সম্পন্ন ও ইনভয়েস তৈরি</button>
+      </div>` : ''}`;
+};
+
+// ---------- Salesman: My Sales ----------
+Pages.mysales = async () => {
+  const all = await DB.all('sales');
+  const my = all.filter(s => s.salesmanId === App.user.id).sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate));
+  const today = my.filter(s => s.saleDate?.slice(0, 10) === todayKey());
+  const todayTotal = today.reduce((s, x) => s + x.total, 0);
+
+  return `
+    <h1 class="page-title">🧾 আমার বিক্রয়</h1>
+    <div class="grid-2 mb-3">
+      <div class="card" style="background:#dbeafe;">
+        <div class="text-xs">আজকের বিক্রয়</div>
+        <div style="font-size:20px;font-weight:700;">${bdt(todayTotal)}</div>
+        <div class="text-xs text-slate">${today.length} টি বিল</div>
+      </div>
+      <div class="card" style="background:#dcfce7;">
+        <div class="text-xs">সর্বমোট</div>
+        <div style="font-size:20px;font-weight:700;">${bdt(my.reduce((s, x) => s + x.total, 0))}</div>
+        <div class="text-xs text-slate">${my.length} টি বিল</div>
+      </div>
+    </div>
+    ${my.length === 0 ? '<div class="card text-center text-slate" style="padding:32px;">এখনো কোনো বিক্রয় করেননি</div>' : ''}
+    ${my.map(s => `
+      <div class="card" data-view-sale="${s.id}" style="cursor:pointer;">
+        <div class="flex justify-between items-start">
+          <div>
+            <div style="font-weight:600;font-size:14px;">${esc(s.invoiceNo)}</div>
+            <div class="text-sm text-slate">${esc(s.customerName)}</div>
+            <div class="text-xs text-slate">${fmtDateTime(s.saleDate)}</div>
+          </div>
+          <div class="text-right">
+            <div style="font-weight:700;">${bdt(s.total)}</div>
+            ${s.due > 0 ? `<div class="text-xs text-red">বাকি: ${bdt(s.due)}</div>` : '<span class="badge badge-green">পরিশোধ</span>'}
+          </div>
+        </div>
+      </div>`).join('')}`;
+};
+
+// ---------- Sync Page ----------
+Pages.sync = async () => {
+  const isAdmin = App.user.role === 'admin';
+  const counts = {
+    products: (await DB.all('products')).length,
+    customers: (await DB.all('customers')).length,
+    sales: (await DB.all('sales')).length,
+    users: (await DB.all('users')).length
+  };
+
+  return `
+    <h1 class="page-title">📡 সিঙ্ক ও ব্যাকআপ</h1>
+
+    <div class="card" style="background:#eff6ff;border-left:4px solid #2563eb;">
+      <div class="text-sm" style="color:#1e40af;">
+        <b>ℹ️ একই ডিভাইসে অটো-সিঙ্ক:</b> একই ব্রাউজারে Admin আর Salesman ট্যাব খোলা থাকলে সব ডেটা অটোমেটিক সিঙ্ক হবে।
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-weight:700;margin:0 0 10px;">📊 ডেটা স্ট্যাটস</h2>
+      <div class="flex justify-between text-sm" style="padding:6px 0;"><span>প্রোডাক্ট</span><b>${counts.products}</b></div>
+      <div class="flex justify-between text-sm" style="padding:6px 0;"><span>কাস্টমার</span><b>${counts.customers}</b></div>
+      <div class="flex justify-between text-sm" style="padding:6px 0;"><span>বিক্রয়</span><b>${counts.sales}</b></div>
+      <div class="flex justify-between text-sm" style="padding:6px 0;"><span>ইউজার</span><b>${counts.users}</b></div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-weight:700;margin:0 0 8px;">📤 ব্যাকআপ ডাউনলোড</h2>
+      <p class="text-sm text-slate mb-3">সব ডেটা JSON ফাইলে সেভ হবে। অন্য ডিভাইসে পাঠাতে পারবেন।</p>
+      <button class="btn btn-primary btn-block" id="dlBackup">⬇️ ডাউনলোড</button>
+    </div>
+
+    <div class="card">
+      <h2 style="font-weight:700;margin:0 0 8px;">📥 রিস্টোর / মার্জ</h2>
+      <p class="text-sm text-slate mb-3">অন্য ডিভাইসের JSON ফাইল নিয়ে আসুন — ডেটা মার্জ হবে (বিক্রয়/কাস্টমার যোগ হবে, প্রোডাক্ট আপডেট হবে)।</p>
+      <label class="btn btn-dark btn-block" style="cursor:pointer;">
+        ⬆️ ফাইল সিলেক্ট করুন
+        <input type="file" accept=".json" id="restoreInput" style="display:none;" />
+      </label>
+    </div>
+
+    ${isAdmin ? `
+    <div class="card" style="background:#fef3c7;border-left:4px solid #f59e0b;">
+      <h2 style="font-weight:700;margin:0 0 8px;">⚠️ ডেঞ্জার জোন</h2>
+      <button class="btn btn-danger btn-block" id="clearAll">সব ডেটা মুছে ফেলুন</button>
+    </div>` : ''}
+  `;
+};
+
+// ---------- Settings ----------
+Pages.settings = async () => {
+  const shopName = localStorage.getItem('shopName') || 'আমার কাপড়ের দোকান';
+  const shopAddr = localStorage.getItem('shopAddr') || '';
+  const shopPhone = localStorage.getItem('shopPhone') || '';
+
+  return `
+    <h1 class="page-title">⚙️ সেটিংস</h1>
+    <div class="card">
+      <h2 style="font-weight:700;margin:0 0 12px;">🏪 দোকানের তথ্য (ইনভয়েসে দেখাবে)</h2>
+      <label class="text-xs text-slate">দোকানের নাম</label>
+      <input class="input mb-2" id="setShopName" value="${esc(shopName)}" />
+      <label class="text-xs text-slate">ঠিকানা</label>
+      <input class="input mb-2" id="setShopAddr" value="${esc(shopAddr)}" />
+      <label class="text-xs text-slate">মোবাইল</label>
+      <input class="input mb-3" id="setShopPhone" value="${esc(shopPhone)}" />
+      <button class="btn btn-primary btn-block" id="saveSettings">সেভ করুন</button>
+    </div>
+    <div class="card">
+      <h2 style="font-weight:700;margin:0 0 10px;">ℹ️ সিস্টেম তথ্য</h2>
+      <div class="text-sm text-slate">TextilePOS v1.0</div>
+      <div class="text-sm text-slate">💾 সব ডেটা IndexedDB-তে</div>
+      <div class="text-sm text-slate">📡 একই ব্রাউজারে অটো-সিঙ্ক</div>
+      <div class="text-sm text-slate">🖨️ ইনভয়েস প্রিন্ট সাপোর্ট</div>
+    </div>`;
+};
+
+// ============ Page Events (attach event listeners) ============
+const PageEvents = {};
+
+// -- dashboard
+PageEvents.dashboard = () => {
+  document.querySelectorAll('[data-view-sale]').forEach(el => {
+    el.onclick = () => openInvoiceModal(Number(el.dataset.viewSale));
+  });
+};
+
+// -- sales
+PageEvents.sales = () => {
+  document.querySelectorAll('[data-view-sale]').forEach(el => {
+    el.onclick = () => openInvoiceModal(Number(el.dataset.viewSale));
+  });
+
+  const search = $('salesSearch'), filter = $('salesFilter');
+  const apply = () => {
+    const q = (search?.value || '').toLowerCase();
+    const sm = filter?.value || '';
+    document.querySelectorAll('.sale-row').forEach(row => {
+      const txt = row.dataset.text || '';
+      const rsm = row.dataset.sm || '';
+      const ok = (!q || txt.includes(q)) && (!sm || rsm === sm);
+      row.style.display = ok ? '' : 'none';
+    });
+  };
+  if (search) search.oninput = apply;
+  if (filter) filter.onchange = apply;
+};
+
+// -- salesmen
+PageEvents.salesmen = () => {
+  const addBtn = $('addSalesman');
+  if (addBtn) addBtn.onclick = () => openSalesmanForm();
+
+  document.querySelectorAll('[data-del-sm]').forEach(el => {
+    el.onclick = async () => {
+      if (!await confirmBox('সেলসম্যান মুছে ফেলবেন?')) return;
+      await DB.del('users', Number(el.dataset.delSm));
+      toast('মুছে ফেলা হয়েছে', 'success');
+      App.render();
+    };
+  });
+};
+
+// -- customers
+PageEvents.customers = () => {
+  const addBtn = $('addCustomer');
+  if (addBtn) addBtn.onclick = () => openCustomerForm();
+
+  document.querySelectorAll('[data-pay-cust]').forEach(el => {
+    el.onclick = () => openPaymentForm(Number(el.dataset.payCust));
+  });
+
+  const s = $('custSearch');
+  if (s) s.oninput = () => {
+    const q = s.value.toLowerCase();
+    document.querySelectorAll('.cust-row').forEach(el => {
+      el.style.display = (el.dataset.text || '').includes(q) ? '' : 'none';
+    });
+  };
+};
+
+// -- products
+PageEvents.products = () => {
+  const addBtn = $('addProduct');
+  if (addBtn) addBtn.onclick = () => openProductForm();
+
+  document.querySelectorAll('[data-edit-prod]').forEach(el => {
+    el.onclick = async () => openProductForm(await DB.get('products', Number(el.dataset.editProd)));
+  });
+  document.querySelectorAll('[data-del-prod]').forEach(el => {
+    el.onclick = async () => {
+      if (!await confirmBox('প্রোডাক্ট মুছে ফেলবেন?')) return;
+      await DB.del('products', Number(el.dataset.delProd));
+      broadcast('data-changed');
+      toast('মুছে ফেলা হয়েছে', 'success');
+      App.render();
+    };
+  });
+
+  const s = $('prodSearch');
+  if (s) s.oninput = () => {
+    const q = s.value.toLowerCase();
+    document.querySelectorAll('.prod-row').forEach(el => {
+      el.style.display = (el.dataset.text || '').includes(q) ? '' : 'none';
+    });
+  };
+};
+
+// -- POS
+PageEvents.pos = () => {
+  const s = $('posSearch');
+  if (s) s.oninput = () => {
+    const q = s.value.toLowerCase();
+    document.querySelectorAll('.pos-prod').forEach(el => {
+      el.style.display = (el.dataset.name || '').includes(q) ? '' : 'none';
+    });
+  };
+
+  const typeSel = $('posType');
+  if (typeSel) typeSel.onchange = () => { App.saleType = typeSel.value; App.render(); };
+
+  document.querySelectorAll('.pos-prod').forEach(el => {
+    el.onclick = () => addToCart(Number(el.dataset.id));
+  });
+
+  document.querySelectorAll('[data-qty]').forEach(el => {
+    el.onclick = () => {
+      const i = Number(el.dataset.i);
+      if (el.dataset.qty === 'inc') App.cart[i].qty += 1;
+      else App.cart[i].qty = Math.max(1, App.cart[i].qty - 1);
+      App.render();
+    };
+  });
+  document.querySelectorAll('[data-rm]').forEach(el => {
+    el.onclick = () => { App.cart.splice(Number(el.dataset.rm), 1); App.render(); };
+  });
+
+  const clearBtn = $('clearCart');
+  if (clearBtn) clearBtn.onclick = () => { App.cart = []; App.discount = 0; App.paid = 0; App.render(); };
+
+  document.querySelectorAll('[data-cust-mode]').forEach(el => {
+    el.onclick = () => {
+      App.customerSel.mode = el.dataset.custMode;
+      App.customerSel.id = null;
+      if (el.dataset.custMode !== 'new') { App.customerSel.name = ''; App.customerSel.phone = ''; }
+      App.render();
+    };
+  });
+
+  const custSel = $('posCustSel');
+  if (custSel) custSel.onchange = () => { App.customerSel.id = custSel.value ? Number(custSel.value) : null; };
+
+  const newName = $('newCustName');
+  if (newName) newName.oninput = () => { App.customerSel.name = newName.value; };
+  const newPhone = $('newCustPhone');
+  if (newPhone) newPhone.oninput = () => { App.customerSel.phone = newPhone.value; };
+
+  const disc = $('posDiscount');
+  if (disc) disc.oninput = () => { App.discount = Number(disc.value) || 0; updatePOSSummary(); };
+  const paid = $('posPaid');
+  if (paid) paid.oninput = () => { App.paid = Number(paid.value) || 0; updatePOSSummary(); };
+  const meth = $('posMethod');
+  if (meth) meth.onchange = () => { App.method = meth.value; };
+
+  const submitBtn = $('submitSale');
+  if (submitBtn) submitBtn.onclick = submitSaleHandler;
+};
+
+function updatePOSSummary() {
+  const subtotal = App.cart.reduce((s, i) => s + i.qty * i.rate, 0);
+  const total = subtotal - App.discount;
+  const due = total - App.paid;
+  // Simple: re-render
+  App.render();
+}
+
+async function addToCart(productId) {
+  const p = await DB.get('products', productId);
+  if (!p) return;
+  if (p.stockQty <= 0) return toast('স্টক নেই!', 'error');
+  const rate = App.saleType === 'wholesale' ? p.wholesalePrice : p.retailPrice;
+  const ex = App.cart.find(i => i.productId === productId);
+  if (ex) ex.qty += 1;
+  else App.cart.push({ productId, name: p.name, qty: 1, rate });
+  App.render();
+}
+
+async function submitSaleHandler() {
+  if (!App.cart.length) return toast('কার্ট খালি', 'error');
+  const sel = App.customerSel;
+  let customerInfo = {};
+
+  if (sel.mode === 'existing' && sel.id) customerInfo = { id: sel.id };
+  else if (sel.mode === 'new') {
+    if (!sel.name?.trim()) return toast('নতুন কাস্টমারের নাম লিখুন', 'error');
+    customerInfo = { name: sel.name.trim(), phone: sel.phone?.trim() || '' };
+  }
+
+  try {
+    const sale = await createSale({
+      items: App.cart,
+      customerInfo,
+      discount: App.discount,
+      paid: App.paid,
+      paymentMethod: App.method,
+      salesmanId: App.user.id,
+      salesmanName: App.user.name,
+      type: App.saleType
+    });
+
+    // reset
+    App.cart = []; App.discount = 0; App.paid = 0;
+    App.customerSel = { mode: 'walkin', id: null, name: '', phone: '' };
+
+    toast('✅ বিক্রয় সম্পন্ন! ' + sale.invoiceNo, 'success');
+    App.render();
+    setTimeout(() => openInvoiceModal(sale.id), 300);
+  } catch (e) {
+    toast('ব্যর্থ: ' + e.message, 'error');
+  }
+}
+
+// -- mysales
+PageEvents.mysales = () => {
+  document.querySelectorAll('[data-view-sale]').forEach(el => {
+    el.onclick = () => openInvoiceModal(Number(el.dataset.viewSale));
+  });
+};
+
+// -- sync
+PageEvents.sync = () => {
+  const dlBtn = $('dlBackup');
+  if (dlBtn) dlBtn.onclick = async () => {
+    const data = { exportedAt: new Date().toISOString(), version: 1 };
+    for (const s of ['users', 'products', 'customers', 'sales', 'payments']) {
+      data[s] = await DB.all(s);
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `textilepos-backup-${todayKey()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('ব্যাকআপ ডাউনলোড হয়েছে', 'success');
+  };
+
+  const inp = $('restoreInput');
+  if (inp) inp.onchange = async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      let added = 0, updated = 0;
+      // merge by id
+      for (const store of ['products', 'customers', 'sales', 'payments', 'users']) {
+        if (!data[store]) continue;
+        const existing = await DB.all(store);
+        const existingIds = new Set(existing.map(x => x.id));
+        for (const item of data[store]) {
+          if (existingIds.has(item.id)) {
+            await DB.put(store, item);
+            updated++;
+          } else {
+            // add without id so it gets new one? No - keep id to avoid dup
+            try { await DB.add(store, item); added++; } catch (err) { /* skip dup */ }
+          }
+        }
+      }
+      broadcast('data-changed');
+      toast(`✅ মার্জ: ${added} নতুন, ${updated} আপডেট`, 'success');
+      App.render();
+    } catch (err) {
+      toast('ফাইল পড়া যায়নি: ' + err.message, 'error');
+    }
+  };
+
+  const clearBtn = $('clearAll');
+  if (clearBtn) clearBtn.onclick = async () => {
+    if (!await confirmBox('সব ডেটা মুছে যাবে! নিশ্চিত?')) return;
+    for (const s of ['products', 'customers', 'sales', 'payments', 'users']) await DB.clear(s);
+    broadcast('data-changed');
+    toast('সব ডেটা মুছে ফেলা হয়েছে', 'success');
+    App.render();
+  };
+};
+
+// -- settings
+PageEvents.settings = () => {
+  const btn = $('saveSettings');
+  if (btn) btn.onclick = () => {
+    localStorage.setItem('shopName', $('setShopName').value.trim());
+    localStorage.setItem('shopAddr', $('setShopAddr').value.trim());
+    localStorage.setItem('shopPhone', $('setShopPhone').value.trim());
+    toast('✅ সেটিংস সেভ হয়েছে', 'success');
+  };
+};
+
+// ============ Modals & Forms ============
+
+// -- Invoice Modal
+async function openInvoiceModal(saleId) {
+  const sale = await DB.get('sales', saleId);
+  if (!sale) return;
+  const shopName = localStorage.getItem('shopName') || 'আমার কাপড়ের দোকান';
+  const shopAddr = localStorage.getItem('shopAddr') || '';
+  const shopPhone = localStorage.getItem('shopPhone') || '';
+
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.id = 'invoiceModal';
+  ov.innerHTML = `
+    <div class="modal" style="max-width:500px;padding:0;">
+      <div style="padding:16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+        <b>🧾 ইনভয়েস</b>
+        <button class="btn btn-sm btn-outline" data-close-inv>✕</button>
+      </div>
+      <div style="padding:16px;" id="invBody">
+        ${buildInvoicePreviewHTML(sale, { shopName, shopAddr, shopPhone })}
+      </div>
+      <div style="padding:16px;border-top:1px solid #e2e8f0;display:flex;gap:8px;">
+        <button class="btn btn-outline" style="flex:1;" data-close-inv>বন্ধ</button>
+        <button class="btn btn-primary" style="flex:2;" id="printInvBtn">🖨️ প্রিন্ট করুন</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+
+  ov.querySelectorAll('[data-close-inv]').forEach(b => b.onclick = () => ov.remove());
+  ov.querySelector('#printInvBtn').onclick = () => {
+    printHTML(buildInvoiceHTML(sale, { shopName, shopAddr, shopPhone }));
+  };
+}
+
+// Preview version (same as print but styled for modal)
+function buildInvoicePreviewHTML(sale, opts = {}) {
+  const shop = opts.shopName || 'আমার দোকান';
+  const addr = opts.shopAddr || '';
+  const phone = opts.shopPhone || '';
+  const items = sale.items.map((it, i) => `
+    <tr>
+      <td style="padding:6px 4px;text-align:center;font-size:12px;">${i + 1}</td>
+      <td style="padding:6px 4px;font-size:13px;">${esc(it.name)}</td>
+      <td style="padding:6px 4px;text-align:right;font-size:13px;">${it.qty}</td>
+      <td style="padding:6px 4px;text-align:right;font-size:13px;">${bdt(it.rate)}</td>
+      <td style="padding:6px 4px;text-align:right;font-size:13px;">${bdt(it.total)}</td>
+    </tr>`).join('');
+  return `
+    <div style="text-align:center;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:10px;">
+      <div style="font-size:20px;font-weight:700;">${esc(shop)}</div>
+      ${addr ? `<div class="text-xs">${esc(addr)}</div>` : ''}
+      ${phone ? `<div class="text-xs">মোবাইল: ${esc(phone)}</div>` : ''}
+    </div>
+    <div class="flex justify-between text-sm mb-1"><b>ইনভয়েস:</b><span>${esc(sale.invoiceNo)}</span></div>
+    <div class="flex justify-between text-sm mb-1"><b>তারিখ:</b><span>${fmtDateTime(sale.saleDate)}</span></div>
+    <div class="flex justify-between text-sm mb-1"><b>কাস্টমার:</b><span>${esc(sale.customerName)}</span></div>
+    ${sale.customerPhone ? `<div class="flex justify-between text-sm mb-1"><b>মোবাইল:</b><span>${esc(sale.customerPhone)}</span></div>` : ''}
+    ${sale.salesmanName ? `<div class="flex justify-between text-sm mb-1"><b>সেলসম্যান:</b><span>${esc(sale.salesmanName)}</span></div>` : ''}
+    <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+      <thead><tr style="background:#f3f4f6;">
+        <th style="padding:5px 4px;text-align:center;font-size:11px;width:24px;">#</th>
+        <th style="padding:5px 4px;text-align:left;font-size:11px;">আইটেম</th>
+        <th style="padding:5px 4px;text-align:right;font-size:11px;">পরিমাণ</th>
+        <th style="padding:5px 4px;text-align:right;font-size:11px;">দর</th>
+        <th style="padding:5px 4px;text-align:right;font-size:11px;">মোট</th>
+      </tr></thead>
+      <tbody>${items}</tbody>
+    </table>
+    <div style="border-top:2px solid #111;margin-top:10px;padding-top:8px;">
+      <div class="flex justify-between text-sm" style="margin:4px 0;"><span>সাবটোটাল</span><b>${bdt(sale.subtotal)}</b></div>
+      ${sale.discount ? `<div class="flex justify-between text-sm" style="margin:4px 0;"><span>ডিসকাউন্ট</span><b>-${bdt(sale.discount)}</b></div>` : ''}
+      <div class="flex justify-between" style="margin:6px 0;font-size:17px;font-weight:700;"><span>মোট</span><span>${bdt(sale.total)}</span></div>
+      <div class="flex justify-between text-sm" style="margin:4px 0;"><span>পরিশোধ</span><b class="text-green">${bdt(sale.paid)}</b></div>
+      ${sale.due > 0 ? `<div class="flex justify-between text-sm text-red" style="margin:4px 0;font-weight:700;"><span>বাকি</span><b>${bdt(sale.due)}</b></div>` : ''}
+    </div>
+    <div class="text-center text-xs text-slate mt-3" style="border-top:1px dashed #cbd5e1;padding-top:8px;">ধন্যবাদ! আবার আসবেন 🙏</div>`;
+}
+
+// -- Salesman Form
+function openSalesmanForm() {
+  const ov = document.createElement('div');
+  ov.className = 'overlay'; ov.id = 'smForm';
+  ov.innerHTML = `
+    <div class="modal">
+      <h2 style="font-size:18px;font-weight:700;margin:0 0 16px;">🧑‍💼 নতুন সেলসম্যান</h2>
+      <label class="text-xs text-slate">নাম</label>
+      <input class="input mb-2" id="smName" placeholder="সেলসম্যানের নাম" />
+      <label class="text-xs text-slate">লগইন ইউজারনেম</label>
+      <input class="input mb-2" id="smUser" placeholder="লগইনের নাম" />
+      <label class="text-xs text-slate">পাসওয়ার্ড</label>
+      <input class="input mb-3" id="smPass" placeholder="পাসওয়ার্ড" />
+      <div class="grid-2">
+        <button class="btn btn-outline" data-close>বাতিল</button>
+        <button class="btn btn-primary" id="smSave">সেভ</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('[data-close]').onclick = () => ov.remove();
+  ov.querySelector('#smSave').onclick = async () => {
+    const name = $('smName').value.trim();
+    const user = $('smUser').value.trim() || name;
+    const pass = $('smPass').value.trim();
+    if (!name || !user || !pass) return toast('সব তথ্য দিন', 'error');
+    await DB.add('users', { name: user, displayName: name, password: pass, role: 'salesman', createdAt: new Date().toISOString() });
+    broadcast('data-changed');
+    toast('সেলসম্যান যোগ হয়েছে', 'success');
+    ov.remove();
+    App.render();
+  };
+}
+
+// -- Customer Form
+function openCustomerForm() {
+  const ov = document.createElement('div');
+  ov.className = 'overlay'; ov.id = 'custForm';
+  ov.innerHTML = `
+    <div class="modal">
+      <h2 style="font-size:18px;font-weight:700;margin:0 0 16px;">👤 নতুন কাস্টমার</h2>
+      <input class="input mb-2" id="cfName" placeholder="নাম *" />
+      <input class="input mb-2" id="cfPhone" placeholder="মোবাইল" />
+      <input class="input mb-3" id="cfAddr" placeholder="ঠিকানা" />
+      <div class="grid-2">
+        <button class="btn btn-outline" data-close>বাতিল</button>
+        <button class="btn btn-primary" id="cfSave">সেভ</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('[data-close]').onclick = () => ov.remove();
+  ov.querySelector('#cfSave').onclick = async () => {
+    const name = $('cfName').value.trim();
+    if (!name) return toast('নাম দিন', 'error');
+    await DB.add('customers', {
+      name, phone: $('cfPhone').value.trim(), address: $('cfAddr').value.trim(),
+      due: 0, createdAt: new Date().toISOString()
+    });
+    broadcast('data-changed');
+    toast('যোগ হয়েছে', 'success');
+    ov.remove();
+    App.render();
+  };
+}
+
+// -- Payment Form
+function openPaymentForm(customerId) {
+  DB.get('customers', customerId).then(c => {
+    if (!c) return;
+    const ov = document.createElement('div');
+    ov.className = 'overlay'; ov.id = 'payForm';
+    ov.innerHTML = `
+      <div class="modal">
+        <h2 style="font-size:18px;font-weight:700;margin:0 0 4px;">💵 পেমেন্ট গ্রহণ</h2>
+        <p class="text-sm text-slate mb-3">${esc(c.name)} — বাকি: <b class="text-red">${bdt(c.due)}</b></p>
+        <input type="number" class="input mb-2" id="pfAmt" placeholder="টাকার পরিমাণ *" />
+        <select class="input mb-3" id="pfMethod">
+          <option value="cash">ক্যাশ</option><option value="bkash">বিকাশ</option>
+          <option value="nagad">নগদ</option><option value="rocket">রকেট</option>
+          <option value="bank">ব্যাংক</option>
+        </select>
+        <div class="grid-2">
+          <button class="btn btn-outline" data-close>বাতিল</button>
+          <button class="btn btn-primary" id="pfSave">সেভ</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('[data-close]').onclick = () => ov.remove();
+    ov.querySelector('#pfSave').onclick = async () => {
+      const amt = Number($('pfAmt').value) || 0;
+      if (amt <= 0) return toast('পরিমাণ দিন', 'error');
+      const method = $('pfMethod').value;
+      const fresh = await DB.get('customers', customerId);
+      if (!fresh) return;
+      fresh.due = Math.max(0, (fresh.due || 0) - amt);
+      await DB.put('customers', fresh);
+      await DB.add('payments', {
+        customerId, customerName: fresh.name, amount: amt, method,
+        note: 'Manual collection', paymentDate: new Date().toISOString()
+      });
+      broadcast('data-changed');
+      toast('✅ পেমেন্ট সম্পন্ন', 'success');
+      ov.remove();
+      App.render();
+    };
+  });
+}
+
+// -- Product Form
+async function openProductForm(p = null) {
+  const ov = document.createElement('div');
+  ov.className = 'overlay'; ov.id = 'prodForm';
+  ov.innerHTML = `
+    <div class="modal">
+      <h2 style="font-size:18px;font-weight:700;margin:0 0 16px;">${p ? 'এডিট প্রোডাক্ট' : '📦 নতুন প্রোডাক্ট'}</h2>
+      <input class="input mb-2" id="pfName" placeholder="প্রোডাক্টের নাম *" value="${esc(p?.name || '')}" />
+      <input class="input mb-2" id="pfUnit" placeholder="ইউনিট (পিস/গজ)" value="${esc(p?.unit || 'পিস')}" />
+      <input type="number" class="input mb-2" id="pfWhole" placeholder="হোলসেল দাম" value="${p?.wholesalePrice || ''}" />
+      <input type="number" class="input mb-2" id="pfRetail" placeholder="রিটেল দাম" value="${p?.retailPrice || ''}" />
+      <input type="number" class="input mb-2" id="pfStock" placeholder="স্টক পরিমাণ" value="${p?.stockQty || ''}" />
+      <input type="number" class="input mb-3" id="pfLow" placeholder="লো স্টক অ্যালার্ট" value="${p?.lowStockAlert || 5}" />
+      <div class="grid-2">
+        <button class="btn btn-outline" data-close>বাতিল</button>
+        <button class="btn btn-primary" id="pfSave">সেভ</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('[data-close]').onclick = () => ov.remove();
+  ov.querySelector('#pfSave').onclick = async () => {
+    const data = {
+      name: $('pfName').value.trim(),
+      unit: $('pfUnit').value.trim() || 'পিস',
+      wholesalePrice: Number($('pfWhole').value) || 0,
+      retailPrice: Number($('pfRetail').value) || 0,
+      stockQty: Number($('pfStock').value) || 0,
+      lowStockAlert: Number($('pfLow').value) || 5
+    };
+    if (!data.name) return toast('নাম দিন', 'error');
+    if (p) { data.id = p.id; await DB.put('products', data); }
+    else { data.createdAt = new Date().toISOString(); await DB.add('products', data); }
+    broadcast('data-changed');
+    toast('সেভ হয়েছে', 'success');
+    ov.remove();
+    App.render();
+  };
+}
+
+// ============ Init ============
+(async function init() {
+  await openDB();
+
+  // restore session
+  const saved = localStorage.getItem('textilepos-user');
+  if (saved) {
+    try { App.user = JSON.parse(saved); } catch (e) {}
+  }
+
+  // if admin exists from storage, render; else show login
+  if (App.user) App.page = App.user.role === 'admin' ? 'dashboard' : 'pos';
+  await App.render();
+})();
+</script>
+</body>
+</html>
