@@ -1,0 +1,56 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>খরচ — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script><script src="common.js"></script>
+<script>
+APP.init('expenses',render);
+async function render(){
+  const items=(await DB.all('expenses')).sort((a,b)=>new Date(b.expenseDate)-new Date(a.expenseDate));
+  const total=items.reduce((s,x)=>s+x.amount,0);
+  document.getElementById('pageContent').innerHTML=`
+    <h1 class="page-title">💸 খরচ</h1>
+    <button class="btn btn-primary btn-block mb-3" onclick="openForm()">+ নতুন খরচ</button>
+    <div class="card mb-3" style="background:#fef3c7;">
+      <div class="text-sm">মোট খরচ</div>
+      <div style="font-size:22px;font-weight:700;">${bdt(total)}</div>
+    </div>
+    ${items.map(e=>`
+      <div class="card">
+        <div class="flex justify-between">
+          <div>
+            <div style="font-weight:600;">${esc(e.category||'খরচ')}</div>
+            <div class="text-xs text-slate">${fmtDate(e.expenseDate)} ${e.note?'• '+esc(e.note):''}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-red" style="font-weight:700;">${bdt(e.amount)}</div>
+            <button class="btn btn-sm mt-1" style="background:#fee2e2;color:#b91c1c;" onclick="delItem(${e.id})">মুছুন</button>
+          </div>
+        </div>
+      </div>`).join('')}
+    ${items.length===0?'<div class="card text-center text-slate" style="padding:32px;">কোনো খরচ নেই</div>':''}`;
+}
+window.openForm=()=>openModal('expM',`
+  <h2 style="font-size:18px;font-weight:700;margin:0 0 16px;">নতুন খরচ</h2>
+  <input class="input mb-2" placeholder="ধরন (ভাড়া/বিদ্যুৎ/স্যালারি)" id="exC"/>
+  <input type="number" class="input mb-2" placeholder="টাকার পরিমাণ *" id="exA"/>
+  <input class="input mb-3" placeholder="নোট" id="exN"/>
+  <div class="grid-2">
+    <button class="btn btn-outline" onclick="closeModal('expM')">বাতিল</button>
+    <button class="btn btn-primary" onclick="save()">সেভ</button>
+  </div>`);
+window.save=async()=>{
+  const amt=+document.getElementById('exA').value;
+  if(!amt) return toast('পরিমাণ দিন','error');
+  await DB.add('expenses',{
+    category:document.getElementById('exC').value.trim()||'খরচ',
+    amount:amt,note:document.getElementById('exN').value.trim(),
+    expenseDate:new Date().toISOString()
+  });
+  closeModal('expM');toast('সেভ হয়েছে','success');render();
+};
+window.delItem=async id=>{if(!await confirmBox('মুছবেন?'))return;await DB.del('expenses',id);render()};
+</script></body></html>
