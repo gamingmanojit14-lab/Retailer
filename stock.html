@@ -1,0 +1,46 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>স্টক — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script><script src="common.js"></script>
+<script>
+APP.init('stock',render);
+async function render(){
+  const products=await DB.all('products');
+  const low=products.filter(p=>p.stockQty<=(p.lowStockAlert||5));
+  const totalValue=products.reduce((s,p)=>s+p.stockQty*p.wholesalePrice,0);
+  document.getElementById('pageContent').innerHTML=`
+    <h1 class="page-title">📊 স্টক</h1>
+    <div class="grid-2 mb-3">
+      <div class="card" style="background:#dbeafe;">
+        <div class="text-sm">মোট প্রোডাক্ট</div>
+        <div style="font-size:22px;font-weight:700;">${products.length}</div>
+      </div>
+      <div class="card" style="background:#fee2e2;">
+        <div class="text-sm">কম স্টক</div>
+        <div style="font-size:22px;font-weight:700;">${low.length}</div>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <div class="text-sm text-slate">স্টকের মূল্য (হোলসেল হিসাবে)</div>
+      <div style="font-size:22px;font-weight:700;">${bdt(totalValue)}</div>
+    </div>
+    <h2 style="font-size:16px;font-weight:700;margin:16px 0 10px;">সব প্রোডাক্ট</h2>
+    ${products.map(p=>`
+      <div class="card">
+        <div class="flex justify-between">
+          <div>
+            <div style="font-weight:600;">${esc(p.name)}</div>
+            <div class="text-xs text-slate">${esc(p.unit||'পিস')}</div>
+          </div>
+          <div class="text-right">
+            <div style="font-weight:700;color:${p.stockQty<=(p.lowStockAlert||5)?'#dc2626':'#16a34a'};">${p.stockQty}</div>
+            <div class="text-xs text-slate">৳ ${p.wholesalePrice} × ${p.stockQty}</div>
+          </div>
+        </div>
+      </div>`).join('')}`;
+}
+</script></body></html>
