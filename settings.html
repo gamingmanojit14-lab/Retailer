@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>সেটিংস — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script><script src="common.js"></script>
+<script>
+APP.init('settings',render);
+async function render(){
+  const u=APP.user||{};
+  const counts={
+    products:(await DB.all('products')).length,
+    customers:(await DB.all('customers')).length,
+    sales:(await DB.all('sales')).length,
+    invoices:(await DB.all('sales')).length
+  };
+  document.getElementById('pageContent').innerHTML=`
+    <h1 class="page-title">⚙️ সেটিংস</h1>
+    <div class="card mb-3">
+      <h2 style="font-weight:700;margin:0 0 10px;">দোকানের তথ্য</h2>
+      <label class="text-xs text-slate">আপনার নাম</label>
+      <input class="input mb-2" id="sName" value="${esc(u.name||'')}"/>
+      <label class="text-xs text-slate">দোকানের নাম</label>
+      <input class="input mb-3" id="sShop" value="${esc(u.shop||'')}"/>
+      <button class="btn btn-primary btn-block" onclick="saveInfo()">সেভ করুন</button>
+    </div>
+    <div class="card mb-3">
+      <h2 style="font-weight:700;margin:0 0 10px;">📊 ডেটা স্ট্যাটস</h2>
+      <div class="flex justify-between text-sm" style="padding:6px 0;"><span>প্রোডাক্ট</span><b>${counts.products}</b></div>
+      <div class="flex justify-between text-sm" style="padding:6px 0;"><span>কাস্টমার</span><b>${counts.customers}</b></div>
+      <div class="flex justify-between text-sm" style="padding:6px 0;"><span>ইনভয়েস</span><b>${counts.invoices}</b></div>
+    </div>
+    <div class="card mb-3">
+      <h2 style="font-weight:700;margin:0 0 10px;">ℹ️ সিস্টেম তথ্য</h2>
+      <div class="text-sm text-slate">TextilePOS v1.0</div>
+      <div class="text-sm text-slate">💾 সব ডেটা আপনার ডিভাইসে (IndexedDB)</div>
+      <div class="text-sm text-slate">🌐 অফলাইনে কাজ করে</div>
+    </div>
+    <div class="card" style="background:#fee2e2;border-left:4px solid #dc2626;">
+      <button class="btn btn-danger btn-block" onclick="APP.logout()">লগআউট</button>
+    </div>`;
+}
+window.saveInfo=()=>{
+  const u=JSON.parse(localStorage.getItem('textile-user')||'{}');
+  u.name=document.getElementById('sName').value.trim();
+  u.shop=document.getElementById('sShop').value.trim();
+  localStorage.setItem('textile-user',JSON.stringify(u));
+  APP.user=u;
+  toast('✅ সেভ হয়েছে','success');
+};
+</script></body></html>
