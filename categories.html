@@ -1,0 +1,38 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ক্যাটাগরি — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script><script src="common.js"></script>
+<script>
+APP.init('categories',render);
+async function render(){
+  const items=await DB.all('categories');
+  document.getElementById('pageContent').innerHTML=`
+    <div class="flex justify-between items-center mb-3">
+      <h1 class="page-title" style="margin:0;">🏷️ ক্যাটাগরি</h1>
+      <button class="btn btn-primary" onclick="openForm()">+ নতুন</button>
+    </div>
+    ${items.map(c=>`
+      <div class="card flex justify-between items-center">
+        <span style="font-weight:600;">${esc(c.name)}</span>
+        <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;" onclick="delItem(${c.id})">মুছুন</button>
+      </div>`).join('')}
+    ${items.length===0?'<div class="card text-center text-slate" style="padding:32px;">কোনো ক্যাটাগরি নেই</div>':''}`;
+}
+window.openForm=()=>openModal('catM',`
+  <h2 style="font-size:18px;font-weight:700;margin:0 0 16px;">নতুন ক্যাটাগরি</h2>
+  <input class="input mb-3" placeholder="নাম (যেমন: শাড়ি, থান কাপড়)" id="catN"/>
+  <div class="grid-2">
+    <button class="btn btn-outline" onclick="closeModal('catM')">বাতিল</button>
+    <button class="btn btn-primary" onclick="save()">সেভ</button>
+  </div>`);
+window.save=async()=>{
+  const name=document.getElementById('catN').value.trim();
+  if(!name) return toast('নাম দিন','error');
+  await DB.add('categories',{name});closeModal('catM');toast('যোগ হয়েছে','success');render();
+};
+window.delItem=async id=>{if(!await confirmBox('মুছবেন?'))return;await DB.del('categories',id);render()};
+</script></body></html>
