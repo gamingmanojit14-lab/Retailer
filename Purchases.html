@@ -1,0 +1,87 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>পারচেজ — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script><script src="common.js"></script>
+<script>
+let cart=[];
+APP.init('purchases',async()=>{window._p=await DB.all('products');window._s=await DB.all('suppliers');render()});
+async function render(){
+  const purchases=(await DB.all('purchases')).sort((a,b)=>new Date(b.purchaseDate)-new Date(a.purchaseDate));
+  const total=purchases.reduce((s,x)=>s+x.total,0);
+  document.getElementById('pageContent').innerHTML=`
+    <div class="flex justify-between items-center mb-3">
+      <h1 class="page-title" style="margin:0;">📥 পারচেজ</h1>
+      <button class="btn btn-primary" onclick="openForm()">+ নতুন</button>
+    </div>
+    <div class="card mb-3" style="background:#dbeafe;">
+      <div class="text-sm">মোট পারচেজ</div>
+      <div style="font-size:22px;font-weight:700;">${bdt(total)}</div>
+    </div>
+    ${purchases.map(p=>`
+      <div class="card">
+        <div class="flex justify-between">
+          <div>
+            <div style="font-weight:600;">${esc(p.supplierName||'-')}</div>
+            <div class="text-xs text-slate">${fmtDate(p.purchaseDate)} • ${p.items.length} আইটেম</div>
+          </div>
+          <div class="text-right">
+            <div style="font-weight:700;">${bdt(p.total)}</div>
+            <div class="text-xs ${p.due>0?'text-red':'text-green'}">বাকি: ${bdt(p.due)}</div>
+          </div>
+        </div>
+      </div>`).join('')}
+    ${purchases.length===0?'<div class="card text-center text-slate" style="padding:32px;">কোনো পারচেজ নেই</div>':''}`;
+}
+window.openForm=()=>{
+  cart=[];
+  openModal('pM',`
+    <h2 style="font-size:18px;font-weight:700;margin:0 0 16px;">নতুন পারচেজ</h2>
+    <select class="input mb-2" id="pSup">
+      <option value="">সাপ্লায়ার সিলেক্ট</option>
+      ${window._s.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}
+    </select>
+    <div id="pItems"></div>
+    <button class="btn btn-sm mb-2" style="background:#dbeafe;color:#1e40af;" onclick="addItem()">+ আইটেম</button>
+    <input type="number" class="input mb-2" placeholder="পরিশোধ" id="pPaid" value="0"/>
+    <div class="grid-2">
+      <button class="btn btn-outline" onclick="closeModal('pM')">বাতিল</button>
+      <button class="btn btn-primary" onclick="save()">সেভ</button>
+    </div>`);
+  addItem();
+};
+window.addItem=()=>{
+  const id=Date.now();
+  const html=`
+    <div style="border:1px solid #e2e8f0;padding:8px;border-radius:8px;margin-bottom:6px;" id="pi${id}">
+      <select class="input mb-1" onchange="setProd(${id},this.value)">
+        <option value="">প্রোডাক্ট</option>
+        ${window._p.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}
+      </select>
+      <input type="number" class="input mb-1" placeholder="পরিমাণ" oninput="setQty(${id},this.value)" id="q${id}"/>
+      <input type="number" class="input" placeholder="রেট" oninput="setRate(${id},this.value)" id="r${id}"/>
+    </div>`;
+  document.getElementById('pItems').insertAdjacentHTML('beforeend',html);
+  cart.push({tmp:id,productId:null,qty:0,rate:0});
+};
+window.setProd=(id,v)=>{const it=cart.find(x=>x.tmp===id);if(it)it.productId=+v};
+window.setQty=(id,v)=>{const it=cart.find(x=>x.tmp===id);if(it)it.qty=+v||0};
+window.setRate=(id,v)=>{const it=cart.find(x=>x.tmp===id);if(it)it.rate=+v||0};
+window.save=async()=>{
+  const supId=+document.getElementById('pSup').value;
+  const valid=cart.filter(x=>x.productId&&x.qty&&x.rate);
+  if(!valid.length) return toast('আইটেম যোগ করুন','error');
+  const sup=supId?await DB.get('suppliers',supId):null;
+  const items=[];
+  for(const it of valid){
+    const p=await DB.get('products',it.productId);
+    items.push({productId:it.productId,productName:p.name,qty:it.qty,rate:it.rate});
+  }
+  await createPurchase({supplierId:supId||null,supplierName:sup?.name,items,
+    paid:+document.getElementById('pPaid').value||0});
+  closeModal('pM');toast('✅ পারচেজ সেভ হয়েছে','success');render();
+};
+</script></body></html>
