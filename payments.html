@@ -1,0 +1,33 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>পেমেন্ট — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script><script src="common.js"></script>
+<script>
+APP.init('payments',render);
+async function render(){
+  const items=(await DB.all('payments')).sort((a,b)=>new Date(b.paymentDate)-new Date(a.paymentDate));
+  const total=items.reduce((s,x)=>s+x.amount,0);
+  document.getElementById('pageContent').innerHTML=`
+    <h1 class="page-title">💰 পেমেন্ট</h1>
+    <div class="card mb-3" style="background:#dcfce7;">
+      <div class="text-sm">মোট সংগ্রহ</div>
+      <div style="font-size:22px;font-weight:700;">${bdt(total)}</div>
+    </div>
+    ${items.map(p=>`
+      <div class="card">
+        <div class="flex justify-between">
+          <div>
+            <div style="font-weight:600;">${esc(p.customerName||'-')}</div>
+            <div class="text-xs text-slate">${fmtDateTime(p.paymentDate)} • ${p.method}</div>
+            ${p.note?`<div class="text-xs text-slate">${esc(p.note)}</div>`:''}
+          </div>
+          <div style="color:#16a34a;font-weight:700;">${bdt(p.amount)}</div>
+        </div>
+      </div>`).join('')}
+    ${items.length===0?'<div class="card text-center text-slate" style="padding:32px;">কোনো পেমেন্ট নেই</div>':''}`;
+}
+</script></body></html>
