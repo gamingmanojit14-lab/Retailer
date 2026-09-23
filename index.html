@@ -1,0 +1,56 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ড্যাশবোর্ড — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script>
+<script src="common.js"></script>
+<script>
+APP.init('dashboard',render);
+
+async function render(){
+  const s=await getDashboardStats();
+  const user=APP.user;
+  const cards=[
+    {label:'আজকের বিক্রয়',value:bdt(s.today.total),sub:`${s.today.count} টি বিল`,color:'#3b82f6'},
+    {label:'এই মাসের বিক্রয়',value:bdt(s.month.total),sub:`${s.month.count} টি বিল`,color:'#16a34a'},
+    {label:'মোট বাকি',value:bdt(s.totalDue),sub:'কাস্টমারদের কাছে',color:'#dc2626'},
+    {label:'প্রোডাক্ট',value:s.productCount,sub:`কম স্টক: ${s.lowStock}`,color:'#f59e0b'}
+  ];
+  document.getElementById('pageContent').innerHTML=`
+    <h1 class="page-title">স্বাগতম, ${esc(user.name)} 👋</h1>
+    <div class="grid-2 mb-3">
+      ${cards.map(c=>`<div class="stat-card">
+        <div class="bar" style="background:${c.color}"></div>
+        <div class="lbl">${c.label}</div>
+        <div class="val">${c.value}</div>
+        <div class="text-xs text-slate mt-1">${c.sub}</div>
+      </div>`).join('')}
+    </div>
+    <div class="grid-2 mb-3">
+      <a href="pos.html" class="card" style="text-align:center;background:#2563eb;color:#fff;margin:0;">
+        <div style="font-size:32px;">🛒</div>
+        <div style="font-weight:700;font-size:14px;margin-top:6px;">নতুন বিক্রয়</div>
+      </a>
+      <a href="products.html" class="card" style="text-align:center;background:#16a34a;color:#fff;margin:0;">
+        <div style="font-size:32px;">📦</div>
+        <div style="font-weight:700;font-size:14px;margin-top:6px;">প্রোডাক্ট</div>
+      </a>
+      <a href="customers.html" class="card" style="text-align:center;background:#7c3aed;color:#fff;margin:0;">
+        <div style="font-size:32px;">👤</div>
+        <div style="font-weight:700;font-size:14px;margin-top:6px;">কাস্টমার</div>
+      </a>
+      <a href="reports.html" class="card" style="text-align:center;background:#0f172a;color:#fff;margin:0;">
+        <div style="font-size:32px;">📊</div>
+        <div style="font-weight:700;font-size:14px;margin-top:6px;">রিপোর্ট</div>
+      </a>
+    </div>
+    ${s.lowStock>0?`
+      <div class="card" style="background:#fef3c7;border-left:4px solid #f59e0b;">
+        <div class="text-sm"><b>⚠️ ${s.lowStock}টি প্রোডাক্টের স্টক কম</b></div>
+        <a href="stock.html" class="text-sm" style="color:#92400e;">স্টক দেখুন →</a>
+      </div>`:''}`;
+}
+</script></body></html>
