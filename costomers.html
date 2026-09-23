@@ -1,0 +1,114 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>কাস্টমার — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script><script src="common.js"></script>
+<script>
+APP.init('customers',render);
+
+async function render(){
+  const cs=await DB.all('customers');
+  document.getElementById('pageContent').innerHTML=`
+    <div class="flex justify-between items-center mb-3">
+      <h1 class="page-title" style="margin:0;">👤 কাস্টমার</h1>
+      <button class="btn btn-primary" onclick="openForm()">+ নতুন</button>
+    </div>
+    <input class="input mb-3" placeholder="🔍 খুঁজুন..." oninput="filterList(this.value)" id="searchBox"/>
+    <div id="list">
+      ${cs.length===0?'<div class="card text-center text-slate" style="padding:32px;">কোনো কাস্টমার নেই</div>':''}
+      ${cs.map(c=>`
+        <div class="card cust-item" data-name="${esc((c.name+(c.phone||'')).toLowerCase())}">
+          <div class="flex justify-between items-start">
+            <div>
+              <div style="font-weight:600;">${esc(c.name)}</div>
+              <div class="text-sm text-slate">${esc(c.phone||'-')} • ${c.type==='wholesale'?'হোলসেল':'রিটেল'}</div>
+              <div class="text-sm ${c.due>0?'text-red':'text-green'}" style="font-weight:700;margin-top:4px;">
+                বাকি: ${bdt(c.due)}
+              </div>
+            </div>
+            <div class="flex gap-1" style="flex-direction:column;">
+              ${c.due>0?`<button class="btn btn-sm" style="background:#dcfce7;color:#166534;" onclick="payForm(${c.id})">পেমেন্ট</button>`:''}
+              <button class="btn btn-sm" style="background:#dbeafe;color:#1e40af;" onclick="ledger(${c.id})">লেজার</button>
+              <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;" onclick="delItem(${c.id})">মুছুন</button>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+window.filterList=function(q){
+  q=q.toLowerCase();
+  document.querySelectorAll('.cust-item').forEach(el=>{
+    el.style.display=el.dataset.name.includes(q)?'':'none';
+  });
+};
+window.openForm=()=>openModal('custModal',`
+  <h2 style="font-size:18px;font-weight:700;margin:0 0 16px;">নতুন কাস্টমার</h2>
+  <input class="input mb-2" placeholder="নাম *" id="cName"/>
+  <input class="input mb-2" placeholder="ফোন" id="cPhone"/>
+  <input class="input mb-2" placeholder="ঠিকানা" id="cAddr"/>
+  <select class="input mb-3" id="cType">
+    <option value="retail">রিটেল</option><option value="wholesale">হোলসেল</option>
+  </select>
+  <div class="grid-2">
+    <button class="btn btn-outline" onclick="closeModal('custModal')">বাতিল</button>
+    <button class="btn btn-primary" onclick="saveCust()">সেভ</button>
+  </div>`);
+window.saveCust=async()=>{
+  const data={name:document.getElementById('cName').value.trim(),
+    phone:document.getElementById('cPhone').value.trim(),
+    address:document.getElementById('cAddr').value.trim(),
+    type:document.getElementById('cType').value,due:0};
+  if(!data.name) return toast('নাম দিন','error');
+  await DB.add('customers',data);
+  closeModal('custModal');toast('যোগ হয়েছে','success');render();
+};
+window.payForm=(id)=>openModal('payModal',`
+  <h2 style="font-size:18px;font-weight:700;margin:0 0 16px;">💵 পেমেন্ট গ্রহণ</h2>
+  <input type="number" class="input mb-2" placeholder="টাকার পরিমাণ" id="payAmt"/>
+  <select class="input mb-3" id="payMeth">
+    <option value="cash">ক্যাশ</option><option value="bkash">বিকাশ</option>
+    <option value="nagad">নগদ</option><option value="rocket">রকেট</option>
+    <option value="bank">ব্যাংক</option>
+  </select>
+  <div class="grid-2">
+    <button class="btn btn-outline" onclick="closeModal('payModal')">বাতিল</button>
+    <button class="btn btn-primary" onclick="savePay(${id})">সেভ</button>
+  </div>`);
+window.savePay=async id=>{
+  const amount=+document.getElementById('payAmt').value;
+  if(!amount) return toast('পরিমাণ দিন','error');
+  await collectPayment({customerId:id,amount,method:document.getElementById('payMeth').value});
+  closeModal('payModal');toast('✅ পেমেন্ট গ্রহণ সম্পন্ন','success');render();
+};
+window.ledger=async id=>{
+  const c=await DB.get('customers',id);
+  const sales=(await DB.all('sales')).filter(s=>s.customerId===id);
+  const pays=(await DB.all('payments')).filter(p=>p.customerId===id);
+  const entries=[
+    ...sales.map(s=>({kind:'বিক্রয়',date:s.saleDate,total:s.total,ref:s.invoiceNo})),
+    ...pays.map(p=>({kind:'পেমেন্ট',date:p.paymentDate,total:p.amount,ref:p.method}))
+  ].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  openModal('ledgerModal',`
+    <div class="flex justify-between items-center mb-3">
+      <h2 style="font-size:17px;font-weight:700;margin:0;">${esc(c.name)} — লেজার</h2>
+      <button onclick="closeModal('ledgerModal')" style="background:none;border:none;font-size:22px;cursor:pointer;">×</button>
+    </div>
+    <div style="background:#f1f5f9;padding:10px;border-radius:8px;margin-bottom:12px;">
+      মোট বাকি: <b class="text-red">${bdt(c.due)}</b>
+    </div>
+    ${entries.length===0?'<p class="text-slate text-center">কোনো লেনদেন নেই</p>':
+      entries.map(e=>`
+        <div class="flex justify-between" style="padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+          <div><div>${e.kind} — ${esc(e.ref||'')}</div>
+          <div class="text-xs text-slate">${fmtDate(e.date)}</div></div>
+          <div style="font-weight:600;color:${e.kind==='পেমেন্ট'?'#16a34a':'#dc2626'};">${bdt(e.total)}</div>
+        </div>`).join('')}`);
+};
+window.delItem=async id=>{
+  if(!await confirmBox('মুছে ফেলবেন?')) return;
+  await DB.del('customers',id);toast('মুছে ফেলা হয়েছে','success');render();
+};
+</script></body></html>
