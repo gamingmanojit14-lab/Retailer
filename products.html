@@ -1,0 +1,89 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>প্রোডাক্ট — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script>
+<script src="common.js"></script>
+<script>
+APP.init('products',render);
+
+async function render(){
+  const products=await DB.all('products');
+  const cats=await DB.all('categories');
+  document.getElementById('pageContent').innerHTML=`
+    <div class="flex justify-between items-center mb-3">
+      <h1 class="page-title" style="margin:0;">📦 প্রোডাক্ট</h1>
+      <button class="btn btn-primary" onclick="openForm()">+ নতুন</button>
+    </div>
+    <input class="input mb-3" placeholder="🔍 খুঁজুন..." oninput="filterList(this.value)" id="searchBox"/>
+    <div id="list">
+      ${products.length===0?'<div class="card text-center text-slate" style="padding:32px;">কোনো প্রোডাক্ট নেই</div>':''}
+      ${products.map(p=>`
+        <div class="card prod-item" data-name="${esc(p.name.toLowerCase())}">
+          <div class="flex justify-between items-start">
+            <div>
+              <div style="font-weight:600;">${esc(p.name)}</div>
+              <div class="text-sm text-slate">${p.category?esc(p.category)+' • ':''}হোলসেল: ${bdt(p.wholesalePrice)} • রিটেল: ${bdt(p.retailPrice)}</div>
+              <div class="text-sm ${p.stockQty<=(p.lowStockAlert||5)?'text-red':''}" style="font-weight:${p.stockQty<=(p.lowStockAlert||5)?'700':'400'};">
+                স্টক: ${p.stockQty} ${esc(p.unit||'পিস')}
+              </div>
+            </div>
+            <div class="flex gap-1" style="flex-direction:column;">
+              <button class="btn btn-sm" style="background:#dbeafe;color:#1e40af;" onclick="editItem(${p.id})">এডিট</button>
+              <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;" onclick="delItem(${p.id})">মুছুন</button>
+            </div>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+window.filterList=function(q){
+  q=q.toLowerCase();
+  document.querySelectorAll('.prod-item').forEach(el=>{
+    el.style.display=el.dataset.name.includes(q)?'':'none';
+  });
+};
+window.openForm=async(p=null)=>{
+  const cats=await DB.all('categories');
+  openModal('productModal',`
+    <h2 style="font-size:18px;font-weight:700;margin:0 0 16px;">${p?'এডিট':'নতুন প্রোডাক্ট'}</h2>
+    <input class="input mb-2" placeholder="নাম *" id="pName" value="${esc(p?.name||'')}"/>
+    <select class="input mb-2" id="pCat">
+      <option value="">ক্যাটাগরি নেই</option>
+      ${cats.map(c=>`<option value="${c.name}" ${p?.category===c.name?'selected':''}>${esc(c.name)}</option>`).join('')}
+    </select>
+    <input class="input mb-2" placeholder="ইউনিট" id="pUnit" value="${esc(p?.unit||'পিস')}"/>
+    <input type="number" class="input mb-2" placeholder="হোলসেল প্রাইস" id="pWhole" value="${p?.wholesalePrice||''}"/>
+    <input type="number" class="input mb-2" placeholder="রিটেল প্রাইস" id="pRetail" value="${p?.retailPrice||''}"/>
+    <input type="number" class="input mb-2" placeholder="স্টক" id="pStock" value="${p?.stockQty||''}"/>
+    <input type="number" class="input mb-3" placeholder="লো স্টক অ্যালার্ট" id="pLow" value="${p?.lowStockAlert||5}"/>
+    <div class="grid-2">
+      <button class="btn btn-outline" onclick="closeModal('productModal')">বাতিল</button>
+      <button class="btn btn-primary" onclick="saveItem(${p?.id||'null'})">সেভ</button>
+    </div>`);
+};
+window.saveItem=async(id)=>{
+  const data={
+    name:document.getElementById('pName').value.trim(),
+    category:document.getElementById('pCat').value,
+    unit:document.getElementById('pUnit').value.trim()||'পিস',
+    wholesalePrice:+document.getElementById('pWhole').value||0,
+    retailPrice:+document.getElementById('pRetail').value||0,
+    stockQty:+document.getElementById('pStock').value||0,
+    lowStockAlert:+document.getElementById('pLow').value||5
+  };
+  if(!data.name) return toast('নাম দিন','error');
+  if(id){data.id=id;await DB.put('products',data)}
+  else await DB.add('products',data);
+  closeModal('productModal');
+  toast('সেভ হয়েছে','success');
+  render();
+};
+window.editItem=async id=>{const p=await DB.get('products',id);openForm(p)};
+window.delItem=async id=>{
+  if(!await confirmBox('মুছে ফেলবেন?')) return;
+  await DB.del('products',id);toast('মুছে ফেলা হয়েছে','success');render();
+};
+</script></body></html>
