@@ -1,0 +1,50 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>সাপ্লায়ার — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script><script src="common.js"></script>
+<script>
+APP.init('suppliers',render);
+async function render(){
+  const items=await DB.all('suppliers');
+  document.getElementById('pageContent').innerHTML=`
+    <div class="flex justify-between items-center mb-3">
+      <h1 class="page-title" style="margin:0;">🏭 সাপ্লায়ার</h1>
+      <button class="btn btn-primary" onclick="openForm()">+ নতুন</button>
+    </div>
+    ${items.map(s=>`
+      <div class="card">
+        <div class="flex justify-between items-start">
+          <div>
+            <div style="font-weight:600;">${esc(s.name)}</div>
+            <div class="text-sm text-slate">${esc(s.phone||'-')} • ${esc(s.address||'-')}</div>
+            <div class="text-sm ${s.due>0?'text-red':'text-green'}" style="font-weight:700;margin-top:4px;">
+              দেনা: ${bdt(s.due)}
+            </div>
+          </div>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;" onclick="delItem(${s.id})">মুছুন</button>
+        </div>
+      </div>`).join('')}
+    ${items.length===0?'<div class="card text-center text-slate" style="padding:32px;">কোনো সাপ্লায়ার নেই</div>':''}`;
+}
+window.openForm=()=>openModal('supM',`
+  <h2 style="font-size:18px;font-weight:700;margin:0 0 16px;">নতুন সাপ্লায়ার</h2>
+  <input class="input mb-2" placeholder="নাম *" id="sN"/>
+  <input class="input mb-2" placeholder="ফোন" id="sP"/>
+  <input class="input mb-3" placeholder="ঠিকানা" id="sA"/>
+  <div class="grid-2">
+    <button class="btn btn-outline" onclick="closeModal('supM')">বাতিল</button>
+    <button class="btn btn-primary" onclick="save()">সেভ</button>
+  </div>`);
+window.save=async()=>{
+  const d={name:document.getElementById('sN').value.trim(),
+    phone:document.getElementById('sP').value.trim(),
+    address:document.getElementById('sA').value.trim(),due:0};
+  if(!d.name) return toast('নাম দিন','error');
+  await DB.add('suppliers',d);closeModal('supM');toast('যোগ হয়েছে','success');render();
+};
+window.delItem=async id=>{if(!await confirmBox('মুছবেন?'))return;await DB.del('suppliers',id);render()};
+</script></body></html>
