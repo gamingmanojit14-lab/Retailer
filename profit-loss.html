@@ -1,0 +1,60 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>লাভ-ক্ষতি — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script><script src="common.js"></script>
+<script>
+APP.init('profit-loss',render);
+async function render(){
+  const sales=await DB.all('sales');
+  const expenses=await DB.all('expenses');
+  const purchases=await DB.all('purchases');
+  const revenue=sales.reduce((s,x)=>s+x.total,0);
+  const exp=expenses.reduce((s,x)=>s+x.amount,0);
+  const pur=purchases.reduce((s,x)=>s+x.total,0);
+  const profit=revenue-exp-pur;
+  document.getElementById('pageContent').innerHTML=`
+    <h1 class="page-title">📈 লাভ-ক্ষতি রিপোর্ট</h1>
+    <div class="grid-2 mb-3">
+      <div class="card" style="background:#dcfce7;">
+        <div class="text-xs">মোট আয়</div>
+        <div style="font-size:20px;font-weight:700;color:#166534;">${bdt(revenue)}</div>
+      </div>
+      <div class="card" style="background:#fee2e2;">
+        <div class="text-xs">পারচেজ</div>
+        <div style="font-size:20px;font-weight:700;color:#b91c1c;">${bdt(pur)}</div>
+      </div>
+      <div class="card" style="background:#fef3c7;">
+        <div class="text-xs">খরচ</div>
+        <div style="font-size:20px;font-weight:700;color:#92400e;">${bdt(exp)}</div>
+      </div>
+      <div class="card" style="background:${profit>=0?'#dbeafe':'#fee2e2'};">
+        <div class="text-xs">${profit>=0?'লাভ':'ক্ষতি'}</div>
+        <div style="font-size:20px;font-weight:700;color:${profit>=0?'#1e40af':'#b91c1c'};">${bdt(Math.abs(profit))}</div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 style="font-weight:700;margin:0 0 10px;">মাসিক ব্রেকডাউন</h2>
+      ${monthly(sales,expenses,purchases)}
+    </div>`;
+}
+function monthly(sales,expenses,purchases){
+  const months={};
+  const add=(d,key,val)=>{const m=d.slice(0,7);months[m]=months[m]||{rev:0,exp:0,pur:0};months[m][key]+=val};
+  sales.forEach(s=>add(s.saleDate,'rev',s.total));
+  expenses.forEach(e=>add(e.expenseDate,'exp',e.amount));
+  purchases.forEach(p=>add(p.purchaseDate,'pur',p.total));
+  const arr=Object.entries(months).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,6);
+  if(!arr.length) return '<p class="text-slate text-sm">ডেটা নেই</p>';
+  return arr.map(([m,d])=>{
+    const p=d.rev-d.exp-d.pur;
+    return `<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;">
+      <div class="flex justify-between"><b>${m}</b><b class="${p>=0?'text-green':'text-red'}">${bdt(p)}</b></div>
+      <div class="text-xs text-slate">আয়: ${bdt(d.rev)} • খরচ: ${bdt(d.exp+d.pur)}</div>
+    </div>`;
+  }).join('');
+}
+</script></body></html>
