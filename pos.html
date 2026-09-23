@@ -1,0 +1,114 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>বিক্রয় — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script>
+<script src="common.js"></script>
+<script>
+let cart={items:[],customerId:'',discount:0,paid:0,method:'cash',type:'retail'};
+let products=[],customers=[];
+
+APP.init('pos',async()=>{
+  products=await DB.all('products');
+  customers=await DB.all('customers');
+  renderPOS();
+});
+
+function renderPOS(){
+  const subtotal=cart.items.reduce((s,i)=>s+i.qty*i.rate,0);
+  const total=subtotal-cart.discount;
+  const due=total-cart.paid;
+  document.getElementById('pageContent').innerHTML=`
+    <div class="flex justify-between items-center mb-3">
+      <h1 class="page-title" style="margin:0;">🛒 বিক্রয়</h1>
+      <select class="input" style="width:auto;padding:8px 12px;font-size:13px;" onchange="cart.type=this.value;renderPOS();">
+        <option value="retail" ${cart.type==='retail'?'selected':''}>রিটেল</option>
+        <option value="wholesale" ${cart.type==='wholesale'?'selected':''}>হোলসেল</option>
+      </select>
+    </div>
+    <input class="input mb-3" placeholder="🔍 প্রোডাক্ট খুঁজুন..." id="posSearch" oninput="filterPOS()" />
+    <div class="grid-2 mb-4" id="posGrid" style="padding-bottom:180px;">
+      ${products.length===0?'<div class="card" style="grid-column:1/-1;text-align:center;color:#94a3b8;padding:24px;">প্রোডাক্ট যোগ করুন</div>':''}
+      ${products.map(p=>`
+        <button class="card pos-prod" data-name="${esc(p.name.toLowerCase())}" onclick="addToCart(${p.id})" style="text-align:left;cursor:pointer;margin:0;border:1px solid #e2e8f0;">
+          <div style="font-weight:600;font-size:14px;">${esc(p.name)}</div>
+          <div style="color:#2563eb;font-weight:700;margin-top:6px;">${bdt(cart.type==='wholesale'?p.wholesalePrice:p.retailPrice)}</div>
+          <div class="text-xs text-slate mt-1">স্টক: ${p.stockQty}</div>
+        </button>`).join('')}
+    </div>
+    ${cart.items.length?`
+      <div style="position:fixed;bottom:56px;left:0;right:0;background:#fff;border-top:2px solid #2563eb;padding:12px 16px;box-shadow:0 -4px 12px rgba(0,0,0,.1);z-index:45;max-height:65vh;overflow-y:auto;">
+        <div class="flex justify-between items-center mb-2">
+          <b>🛒 কার্ট (${cart.items.length})</b>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;" onclick="clearCart()">সব মুছুন</button>
+        </div>
+        ${cart.items.map((it,i)=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+            <div style="flex:1;">${esc(it.name)}</div>
+            <button class="btn btn-sm" style="background:#e2e8f0;padding:4px 10px;" onclick="chgQty(${i},-1)">−</button>
+            <span style="width:24px;text-align:center;font-weight:700;">${it.qty}</span>
+            <button class="btn btn-sm" style="background:#e2e8f0;padding:4px 10px;" onclick="chgQty(${i},1)">+</button>
+            <div style="width:70px;text-align:right;">${bdt(it.qty*it.rate)}</div>
+            <button class="btn btn-sm" style="background:transparent;color:#dc2626;padding:4px 8px;" onclick="rmCart(${i})">✕</button>
+          </div>`).join('')}
+        <select class="input mt-2" id="posCust" onchange="cart.customerId=this.value">
+          <option value="">ওয়াক-ইন কাস্টমার</option>
+          ${customers.map(c=>`<option value="${c.id}" ${cart.customerId==c.id?'selected':''}>${esc(c.name)} ${c.due?'(বাকি: '+bdt(c.due)+')':''}</option>`).join('')}
+        </select>
+        <div class="flex justify-between mt-2"><span>সাবটোটাল</span><b>${bdt(subtotal)}</b></div>
+        <div class="flex justify-between items-center mt-1">
+          <span>ডিসকাউন্ট</span>
+          <input type="number" value="${cart.discount}" oninput="cart.discount=+this.value||0;renderPOS();" style="width:100px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;text-align:right;"/>
+        </div>
+        <div class="flex justify-between mt-2" style="padding:8px 0;border-top:1px solid #e2e8f0;font-size:18px;font-weight:700;">
+          <span>মোট</span><span>${bdt(total)}</span>
+        </div>
+        <div class="flex justify-between items-center mt-1">
+          <span>পরিশোধ</span>
+          <input type="number" value="${cart.paid||''}" oninput="cart.paid=+this.value||0;renderPOS();" style="width:100px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;text-align:right;"/>
+        </div>
+        <select class="input mt-2" onchange="cart.method=this.value">
+          <option value="cash">ক্যাশ</option><option value="bkash">বিকাশ</option>
+          <option value="nagad">নগদ</option><option value="rocket">রকেট</option>
+          <option value="bank">ব্যাংক</option>
+        </select>
+        <div class="flex justify-between mt-2 text-red"><span>বাকি</span><b>${bdt(due)}</b></div>
+        <button class="btn btn-primary btn-block mt-2" onclick="submitSale()">✅ বিক্রয় সম্পন্ন</button>
+      </div>`:''}`;
+}
+
+window.filterPOS=function(){
+  const q=document.getElementById('posSearch').value.toLowerCase();
+  document.querySelectorAll('.pos-prod').forEach(el=>el.style.display=el.dataset.name.includes(q)?'':'none');
+};
+window.addToCart=async function(id){
+  const p=await DB.get('products',id);
+  if(!p) return;
+  if(p.stockQty<=0) return toast('স্টক নেই!','error');
+  const rate=cart.type==='wholesale'?p.wholesalePrice:p.retailPrice;
+  const ex=cart.items.find(i=>i.productId===id);
+  if(ex) ex.qty+=1;
+  else cart.items.push({productId:id,name:p.name,qty:1,rate});
+  renderPOS();
+};
+window.chgQty=function(i,d){cart.items[i].qty=Math.max(1,cart.items[i].qty+d);renderPOS()};
+window.rmCart=function(i){cart.items.splice(i,1);renderPOS()};
+window.clearCart=function(){cart.items=[];cart.discount=0;cart.paid=0;renderPOS()};
+window.submitSale=async function(){
+  if(!cart.items.length) return toast('কার্ট খালি','error');
+  try{
+    const sale=await createSale({
+      customerId:cart.customerId?+cart.customerId:null,
+      items:cart.items,discount:cart.discount,paid:cart.paid,
+      paymentMethod:cart.method,type:cart.type
+    });
+    cart={items:[],customerId:'',discount:0,paid:0,method:'cash',type:cart.type};
+    products=await DB.all('products');
+    toast('✅ বিক্রয় সম্পন্ন! '+sale.invoiceNo,'success');
+    renderPOS();
+  }catch(e){toast('ব্যর্থ: '+e.message,'error')}
+};
+</script></body></html>
