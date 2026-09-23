@@ -1,0 +1,67 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>এমপ্লয়ি — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script><script src="common.js"></script>
+<script>
+APP.init('employees',render);
+async function render(){
+  const items=await DB.all('employees');
+  document.getElementById('pageContent').innerHTML=`
+    <div class="flex justify-between items-center mb-3">
+      <h1 class="page-title" style="margin:0;">👨‍💼 এমপ্লয়ি</h1>
+      <button class="btn btn-primary" onclick="openForm()">+ নতুন</button>
+    </div>
+    ${items.map(e=>`
+      <div class="card">
+        <div class="flex justify-between items-start">
+          <div>
+            <div style="font-weight:600;">${esc(e.name)}</div>
+            <div class="text-sm text-slate">${esc(e.phone||'-')} • ${esc(e.designation||'-')}</div>
+            <div class="text-sm text-slate">স্যালারি: ${bdt(e.salary)} • কমিশন: ${e.commissionPercent||0}%</div>
+          </div>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;" onclick="delItem(${e.id})">মুছুন</button>
+        </div>
+      </div>`).join('')}
+    ${items.length===0?'<div class="card text-center text-slate" style="padding:32px;">কোনো এমপ্লয়ি নেই</div>':''}
+    <div class="card mt-3">
+      <h2 style="font-weight:700;margin:0 0 12px;">শেষ ৩০ দিনের পারফরম্যান্স</h2>
+      ${await perfo()}
+    </div>`;
+}
+async function perfo(){
+  const sales=await DB.all('sales');
+  const emps=await DB.all('employees');
+  const since=new Date(Date.now()-30*86400000);
+  return emps.map(e=>{
+    const s=sales.filter(x=>x.saleDate>=since.toISOString()&&x.employeeName===e.name);
+    const total=s.reduce((a,b)=>a+b.total,0);
+    return `<div class="flex justify-between" style="padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+      <span>${esc(e.name)}</span><b>${s.length} • ${bdt(total)}</b></div>`;
+  }).join('')||'<p class="text-slate text-sm">ডেটা নেই</p>';
+}
+window.openForm=()=>openModal('empM',`
+  <h2 style="font-size:18px;font-weight:700;margin:0 0 16px;">নতুন এমপ্লয়ি</h2>
+  <input class="input mb-2" placeholder="নাম *" id="eN"/>
+  <input class="input mb-2" placeholder="ফোন" id="eP"/>
+  <input class="input mb-2" placeholder="পদবি" id="eD"/>
+  <input type="number" class="input mb-2" placeholder="স্যালারি" id="eS"/>
+  <input type="number" class="input mb-3" placeholder="কমিশন %" id="eC"/>
+  <div class="grid-2">
+    <button class="btn btn-outline" onclick="closeModal('empM')">বাতিল</button>
+    <button class="btn btn-primary" onclick="save()">সেভ</button>
+  </div>`);
+window.save=async()=>{
+  const d={name:document.getElementById('eN').value.trim(),
+    phone:document.getElementById('eP').value.trim(),
+    designation:document.getElementById('eD').value.trim(),
+    salary:+document.getElementById('eS').value||0,
+    commissionPercent:+document.getElementById('eC').value||0};
+  if(!d.name) return toast('নাম দিন','error');
+  await DB.add('employees',d);closeModal('empM');toast('যোগ হয়েছে','success');render();
+};
+window.delItem=async id=>{if(!await confirmBox('মুছবেন?'))return;await DB.del('employees',id);render()};
+</script></body></html>
