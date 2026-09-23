@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>লগইন — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script>
+<script>
+(async()=>{
+  await openDB();
+  const saved=localStorage.getItem('textile-user');
+  if(saved){location.href='index.html';return}
+  document.getElementById('app').innerHTML=`
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2563eb,#4f46e5);padding:16px;">
+      <div class="card" style="width:100%;max-width:400px;">
+        <div style="text-align:center;margin-bottom:24px;">
+          <div style="font-size:52px;">🧵</div>
+          <h1 style="font-size:24px;font-weight:700;margin:8px 0;">TextilePOS</h1>
+          <p style="color:#64748b;font-size:13px;margin:0;">কাপড়ের ব্যবসার সফটওয়্যার</p>
+          <p style="color:#16a34a;font-size:11px;margin-top:6px;">💾 সব ডেটা আপনার ডিভাইসে</p>
+        </div>
+        <label style="font-size:13px;color:#475569;">আপনার নাম / দোকানের নাম</label>
+        <input class="input" style="margin:6px 0 16px;" id="loginName" value="Admin" />
+        <label style="font-size:13px;color:#475569;">দোকানের নাম</label>
+        <input class="input" style="margin:6px 0 16px;" id="loginShop" value="আমার কাপড়ের দোকান" />
+        <button class="btn btn-primary btn-block" onclick="doLogin()">শুরু করুন</button>
+        <p style="text-align:center;font-size:11px;color:#94a3b8;margin-top:16px;">
+          কোনো সার্ভার নেই • ইন্টারনেট ছাড়াই চলে
+        </p>
+      </div>
+    </div>`;
+})();
+function doLogin(){
+  const name=document.getElementById('loginName').value.trim();
+  const shop=document.getElementById('loginShop').value.trim();
+  if(!name) return alert('নাম দিন');
+  localStorage.setItem('textile-user',JSON.stringify({name,shop:shop||'আমার দোকান'}));
+  location.href='index.html';
+}
+</script></body></html>
