@@ -1,0 +1,57 @@
+<!DOCTYPE html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>রিপোর্ট — TextilePOS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div id="app"></div>
+<script src="db.js"></script><script src="common.js"></script>
+<script>
+APP.init('reports',render);
+async function render(){
+  const sales=await DB.all('sales');
+  const last7=sales.filter(s=>new Date(s.saleDate)>=new Date(Date.now()-7*86400000));
+  const last30=sales.filter(s=>new Date(s.saleDate)>=new Date(Date.now()-30*86400000));
+  const map={};
+  for(const s of sales) for(const it of s.items) map[it.name]=(map[it.name]||0)+it.qty;
+  const top=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const byDay={};
+  const since14=new Date(Date.now()-14*86400000);
+  sales.filter(s=>new Date(s.saleDate)>=since14).forEach(s=>{
+    const d=s.saleDate.slice(0,10);byDay[d]=(byDay[d]||0)+s.total;
+  });
+  const days=Object.entries(byDay).sort((a,b)=>a[0].localeCompare(b[0]));
+  const max=Math.max(...days.map(d=>d[1]),1);
+  document.getElementById('pageContent').innerHTML=`
+    <h1 class="page-title">📊 রিপোর্ট</h1>
+    <div class="grid-2 mb-3">
+      <div class="card">
+        <div class="text-xs text-slate">৭ দিনের বিক্রয়</div>
+        <div style="font-size:20px;font-weight:700;margin-top:4px;">${bdt(last7.reduce((s,x)=>s+x.total,0))}</div>
+        <div class="text-xs text-slate mt-1">${last7.length} টি বিল</div>
+      </div>
+      <div class="card">
+        <div class="text-xs text-slate">৩০ দিনের বিক্রয়</div>
+        <div style="font-size:20px;font-weight:700;margin-top:4px;">${bdt(last30.reduce((s,x)=>s+x.total,0))}</div>
+        <div class="text-xs text-slate mt-1">${last30.length} টি বিল</div>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <h2 style="font-size:15px;font-weight:700;margin:0 0 12px;">শেষ ১৪ দিনের বিক্রয়</h2>
+      ${days.length===0?'<p class="text-slate text-sm">ডেটা নেই</p>':days.map(([d,v])=>`
+        <div style="margin-bottom:8px;">
+          <div class="flex justify-between text-xs mb-1"><span>${fmtDate(d)}</span><b>${bdt(v)}</b></div>
+          <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
+            <div style="background:#2563eb;height:100%;width:${(v/max)*100}%;"></div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="card">
+      <h2 style="font-size:15px;font-weight:700;margin:0 0 12px;">টপ প্রোডাক্ট</h2>
+      ${top.length===0?'<p class="text-slate text-sm">ডেটা নেই</p>':top.map(([n,q])=>`
+        <div class="flex justify-between" style="padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:13px;">
+          <span>${esc(n)}</span><b>${q} টি</b>
+        </div>`).join('')}
+    </div>`;
+}
+</script></body></html>
